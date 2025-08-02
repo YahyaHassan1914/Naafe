@@ -21,7 +21,7 @@ const Footer = () => {
       title: 'الخدمات',
       links: [
         { label: 'طلب خدمة', href: '/request-service' },
-        { label: 'عرض خدمة', href: '/post-service' },
+
         { label: 'البحث عن خدمات', href: '/search' },
         { label: 'الإعلانات', href: '/advertise' },
       ],

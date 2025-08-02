@@ -473,7 +473,7 @@ const Header = ({ onSearch, searchValue = '' }: HeaderProps) => {
                   </li>
                 ))}
                 <li className="relative">
-                  {user && !isProvider ? (
+                  {user && !isProvider && (
                     <button
                       type="button"
                       className="font-medium text-text-primary hover:text-deep-teal/90 transition-colors duration-200 rounded-lg px-3 py-2 hover:bg-bright-orange/10 focus:outline-none focus:ring-2 focus:ring-deep-teal/50 relative"
@@ -488,14 +488,6 @@ const Header = ({ onSearch, searchValue = '' }: HeaderProps) => {
                         />
                       )}
                     </button>
-                  ) : (
-                    <Link 
-                      to="/post-service"
-                      className={`font-medium transition-colors duration-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-deep-teal/50
-                        ${location.pathname === '/post-service' ? 'text-deep-teal font-extrabold underline underline-offset-8 decoration-bright-orange decoration-4' : 'text-text-primary hover:text-deep-teal/90 hover:bg-bright-orange/10'}`}
-                    >
-                      نشر خدمة
-                    </Link>
                   )}
                 </li>
                 <li>
@@ -614,7 +606,7 @@ const Header = ({ onSearch, searchValue = '' }: HeaderProps) => {
                     </li>
                   ))}
                   <li className="pt-2 border-t border-gray-200 space-y-2">
-                    {user && !isProvider ? (
+                    {user && !isProvider && (
                       <button
                         type="button"
                         className="block font-medium text-text-primary hover:text-deep-teal/90 transition-colors duration-200 rounded-lg px-3 py-2 hover:bg-bright-orange/10 focus:outline-none focus:ring-2 focus:ring-deep-teal/50 w-full text-right"
@@ -623,15 +615,6 @@ const Header = ({ onSearch, searchValue = '' }: HeaderProps) => {
                       >
                         كن مقدم خدمات
                       </button>
-                    ) : (
-                      <Link 
-                        to="/post-service"
-                        className={`block font-medium transition-colors duration-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-deep-teal/50
-                          ${location.pathname === '/post-service' ? 'text-deep-teal font-extrabold underline underline-offset-8 decoration-bright-orange decoration-4' : 'text-text-primary hover:text-deep-teal/90 hover:bg-bright-orange/10'}`}
-                        onClick={closeMobileMenu}
-                      >
-                        نشر خدمة
-                      </Link>
                     )}
                     <Link 
                       to="/request-service"

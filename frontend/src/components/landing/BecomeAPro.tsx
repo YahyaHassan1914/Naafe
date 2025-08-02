@@ -1,20 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
 import { TrendingUp, Users, Clock, Shield } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 const BecomeAPro: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Helper: check if user is provider
-  const isProvider = user && user.roles.includes('provider');
-  
   const handleProviderAction = () => {
     if (!user) {
       navigate('/register');
-    } else if (isProvider) {
-      navigate('/post-service');
     } else {
       // Open upgrade modal - this will be handled by the Header component
       // We'll use a custom event to trigger the modal
@@ -50,7 +45,7 @@ const BecomeAPro: React.FC = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 animate-fade-in">
-            هل أنت محترف متميز؟
+            عايز تكسب من مهاراتك؟
           </h2>
           <p className="text-lg md:text-xl text-white/80 mb-8 max-w-2xl mx-auto animate-fade-in-delayed">
             انضم إلى نافع للتواصل مع عملاء جدد في منطقتك وتنمية أعمالك.
@@ -59,7 +54,7 @@ const BecomeAPro: React.FC = () => {
             onClick={handleProviderAction}
             className="btn btn-primary bg-bright-orange border-bright-orange hover:bg-bright-orange/90 hover:border-bright-orange/90 text-white text-lg font-bold h-14 px-8 mx-auto mb-8 transform hover:scale-105 active:scale-95 transition-all duration-300 animate-fade-in-delayed"
           >
-            {isProvider ? "اعرض خدماتك" : "كن محترفًا اليوم"}
+            انضم لينا كمحترف
           </button>
         </div>
 
@@ -137,18 +132,21 @@ const BecomeAPro: React.FC = () => {
           .animate-fade-in-delayed {
             animation: fade-in-delayed 1.5s ease-out;
           }
-          @keyframes count {
-            from {
-              transform: translateY(1rem);
-              opacity: 0;
-            }
-            to {
-              transform: translateY(0);
-              opacity: 1;
-            }
+          .animate-fade-in-up {
+            animation: fade-in-up 0.6s ease-out;
           }
           .animate-count {
-            animation: count 1s cubic-bezier(0.2, 0.6, 0.4, 1) backwards;
+            animation: count-up 2s ease-out;
+          }
+          @keyframes count-up {
+            from {
+              opacity: 0;
+              transform: translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
           }
         `}</style>
       </div>

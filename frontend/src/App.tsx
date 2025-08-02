@@ -18,7 +18,7 @@ import AdminManageUsers from './admin/pages/AdminManageUsers';
 import AdminManageCategories from './admin/pages/AdminManageCategories';
 import ProfilePage from './pages/ProfilePage';
 import LandingPage from './pages/LandingPage';
-import PostServiceForm from './components/PostServiceForm';
+
 import RequestServiceForm from './components/RequestServiceForm';
 import RequestServiceDetailsPage from './pages/RequestServiceDetailsPage';
 import ServiceResponseForm from './components/ServiceResponseForm';
@@ -98,11 +98,7 @@ const App = () => {
                     <SettingsPage />
                   </ProtectedRoute>
                 } />
-                <Route path="/post-service" element={
-                  <ProtectedRoute requiredRoles={['provider']}>
-                    <PostServiceForm />
-                  </ProtectedRoute>
-                } />
+
                 <Route path="/request-service" element={
                   <ProtectedRoute requiredRoles={['seeker']}>
                     <RequestServiceForm />

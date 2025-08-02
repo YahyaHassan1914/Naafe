@@ -7,92 +7,145 @@ const Hero: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Helper: check if user is provider
-  const isProvider = user && user.roles.includes('provider');
-  
   const handleProviderAction = () => {
     if (!user) {
       navigate('/register');
-    } else if (isProvider) {
-      navigate('/post-service');
     } else {
-      // Open upgrade modal - this will be handled by the Header component
-      // We'll use a custom event to trigger the modal
       window.dispatchEvent(new CustomEvent('openUpgradeModal'));
     }
   };
 
+  const handleSeekerAction = () => {
+    if (!user) {
+      navigate('/register');
+    } else {
+      navigate('/request-service');
+    }
+  };
+
   return (
-    <section className="relative text-white text-center py-20 md:py-48 px-4 font-arabic overflow-hidden">
-      {/* Parallax background */}
+    <section className="relative text-white text-center py-12 md:py-20 px-4 font-arabic overflow-hidden">
+      {/* Optimized background with better gradients */}
       <div
-        className="absolute inset-0 bg-cover bg-center transform transition-transform duration-[1.5s] ease-out will-change-transform"
+        className="absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage:
-            "linear-gradient(rgba(0,128,128,0.5) 0%, rgba(0,64,64,0.9) 100%), url('/images/hero-section.png')",
-          filter: 'blur(0px)',
-          transform: 'scale(1.1)'
+          backgroundImage: `
+            linear-gradient(135deg, 
+              rgba(0,128,128,0.4) 0%, 
+              rgba(0,64,64,0.8) 50%,
+              rgba(0,40,40,0.95) 100%
+            ), 
+            url('/images/hero-section.png')
+          `,
+          transform: 'scale(1.05)',
+          willChange: 'transform'
         }}
         aria-hidden="true"
       />
-      {/* Mobile blur overlay with improved performance */}
+      
+      {/* Mobile performance overlay */}
       <div 
-        className="absolute inset-0 md:hidden bg-black/20 backdrop-blur-[2px]" 
-        style={{willChange: 'backdrop-filter'}} 
+        className="absolute inset-0 md:hidden bg-gradient-to-b from-black/10 to-black/30" 
         aria-hidden="true"
       />
-      <div className="relative z-10 max-w-3xl mx-auto animate-fade-in">
-        <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold leading-tight tracking-tight mb-4 drop-shadow-lg" style={{textShadow: '0 2px 8px rgba(0,0,0,0.25)'}}>
-          سوق خدماتك المحلي في مصر
-        </h1>
-        <div className="text-base sm:text-lg md:text-xl text-gray-200 mb-2 max-w-2xl mx-auto drop-shadow" style={{textShadow: '0 1px 4px rgba(0,0,0,0.18)'}}>
-          <span className="inline-block bg-black/20 rounded-full px-4 py-1 font-semibold animate-fade-in-slow">خدمات منزلية، تعليمية، وأكثر!</span>
+      
+      <div className="relative z-10 max-w-5xl mx-auto">
+        {/* Brand with improved typography */}
+        <div className="mb-12">
+          <h1 className="text-4xl sm:text-6xl md:text-8xl font-black leading-none tracking-tight text-orange-300 drop-shadow-2xl animate-fade-in">
+            نافع
+          </h1>
         </div>
-        <p className="text-base sm:text-lg md:text-xl text-gray-200 mb-8 max-w-2xl mx-auto drop-shadow" style={{textShadow: '0 1px 4px rgba(0,0,0,0.18)'}}>
-          نافع تربطك بمحترفين مهرة لكل شيء من إصلاح المنازل إلى العناية الشخصية. ابحث عن مساعدة موثوقة اليوم.
-        </p>
-        <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 items-center w-full animate-fade-in-slow">
-          <button
-            className="min-w-[180px] cursor-pointer rounded-full h-14 px-8 flex items-center justify-center bg-white text-naafe-teal border-2 border-naafe-teal text-lg font-bold shadow-lg hover:bg-gray-100 hover:border-naafe-teal/80 transform hover:scale-105 active:scale-95 transition-all gap-2 focus:outline-none focus:ring-2 focus:ring-naafe-teal"
-            onClick={() => navigate('/search')}
-            aria-label="ابحث عن محترف"
-          >
-            <Search className="w-5 h-5" style={{ color: '#2d5d4f' }} aria-hidden="true" />
-            <span className="truncate text-[#2d5d4f]">ابحث عن محترف</span>
-          </button>
-          <button
-            className="min-w-[180px] cursor-pointer rounded-full h-14 px-8 flex items-center justify-center bg-[#ff5722] text-white text-lg font-bold shadow-lg hover:bg-[#e64a19] transform hover:scale-105 active:scale-95 transition-all gap-2 focus:outline-none focus:ring-2 focus:ring-[#ff5722]/50"
-            onClick={handleProviderAction}
-            aria-label={isProvider ? "اعرض خدماتك" : "كن محترفًا"}
-          >
-            <UserPlus className="w-5 h-5 text-white" aria-hidden="true" />
-            <span className="truncate">{isProvider ? "اعرض خدماتك" : "كن محترفًا"}</span>
-          </button>
+
+        {/* Enhanced value proposition */}
+        <div className="mb-10">
+          <h2 className="text-xl sm:text-3xl md:text-5xl font-bold leading-tight mb-6 text-white drop-shadow-xl animate-fade-in-delay">
+            منصة الخدمات الأسرع والأكثر أماناً في مصر
+          </h2>
+        </div>
+
+        {/* Refined description */}
+        <div className="mb-12">
+          <p className="text-base sm:text-lg md:text-xl text-gray-100 max-w-4xl mx-auto leading-relaxed drop-shadow-lg animate-fade-in-slow">
+            نافع بتساعدك تلاقي محترفين بطريقة سريعة وموثوقة. متشيلش هم مشاكل الخدمات، ولو انت محترف متخافش من ضياع تعبك! 
+            <span className="text-orange-200 font-semibold"> نافع بتضمن للجميع تجربة سلسة ومميزة!</span>
+          </p>
+        </div>
+        
+        {/* Improved CTA cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto animate-fade-in-cards">
+          {/* Service Seeker Card */}
+          <div className="group relative overflow-hidden bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-white/10 hover:border-white/20 transition-all duration-500 hover:bg-white/10 hover:-translate-y-2 hover:shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
+                <Search className="w-8 h-8 text-white drop-shadow" />
+              </div>
+              
+              <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
+                بتدور على محترف؟
+              </h3>
+              <p className="text-gray-200/90 mb-8 text-sm md:text-base leading-relaxed px-2">
+                انشر طلبك دلوقتي وهنساعدك تلاقي محترفين موثوقين في دقايق
+              </p>
+              
+              <button
+                className="w-full bg-white text-teal-800 rounded-2xl py-4 px-8 font-bold text-base md:text-lg shadow-xl hover:shadow-2xl hover:bg-gray-50 active:scale-[0.98] transition-all duration-300"
+                onClick={handleSeekerAction}
+                aria-label="انشر طلبك في ثواني"
+              >
+                انشر طلبك في ثواني
+              </button>
+            </div>
+          </div>
+          
+          {/* Provider Card */}
+          <div className="group relative overflow-hidden bg-gradient-to-br from-orange-500/15 to-red-600/15 backdrop-blur-md rounded-3xl p-10 border border-orange-400/20 hover:border-orange-400/40 transition-all duration-500 hover:from-orange-500/25 hover:to-red-600/25 hover:-translate-y-2 hover:shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-orange-400/30 to-red-500/30 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm">
+                <UserPlus className="w-8 h-8 text-white drop-shadow" />
+              </div>
+              
+              <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">
+                عايز تكسب من مهاراتك؟
+              </h3>
+              <p className="text-gray-200/90 mb-8 text-sm md:text-base leading-relaxed px-2">
+                انضم لينا كمحترف وابدأ تجربة آمنة ومضمونة من غير ضياع حقوقك
+              </p>
+              
+              <button
+                className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-2xl py-4 px-8 font-bold text-base md:text-lg shadow-xl hover:shadow-2xl hover:from-orange-600 hover:to-red-700 active:scale-[0.98] transition-all duration-300"
+                onClick={handleProviderAction}
+                aria-label="انضم لينا كمحترف"
+              >
+                انضم لينا كمحترف
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-      {/* Scroll indicator with improved animation */}
-      <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-20 flex flex-col items-center animate-bounce-slow">
-        <span className="text-white/80 text-xs mb-1">مرر للأسفل</span>
-        <svg className="w-6 h-6 text-white/80" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </div>
-      {/* Enhanced animations */}
+      
+      {/* Optimized animations */}
       <style>{`
         @keyframes fade-in {
-          from { opacity: 0; transform: translateY(24px); }
-          to { opacity: 1; transform: none; }
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes bounce-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
+        
+        .animate-fade-in { 
+          animation: fade-in 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s both; 
         }
-        .animate-fade-in { animation: fade-in 1s cubic-bezier(.4,0,.2,1) both; }
-        .animate-fade-in-slow { animation: fade-in 1.6s cubic-bezier(.4,0,.2,1) both; }
-        .animate-bounce-slow { animation: bounce-slow 2s ease-in-out infinite; }
+        .animate-fade-in-delay { 
+          animation: fade-in 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s both; 
+        }
+        .animate-fade-in-slow { 
+          animation: fade-in 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.8s both; 
+        }
+        .animate-fade-in-cards { 
+          animation: fade-in 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) 1.1s both; 
+        }
       `}</style>
     </section>
   );
 };
 
-export default Hero; 
+export default Hero;
