@@ -21,6 +21,33 @@ export const handleValidationErrors = (req, res, next) => {
   next();
 };
 
+// Subcategory validation
+const validateSubcategory = [
+  body('subcategories.*.name')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Subcategory name must be between 2 and 100 characters')
+    .trim()
+    .escape(),
+  
+  body('subcategories.*.description')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Subcategory description cannot exceed 500 characters')
+    .trim()
+    .escape(),
+  
+  body('subcategories.*.icon')
+    .optional()
+    .isLength({ max: 100 })
+    .withMessage('Subcategory icon cannot exceed 100 characters')
+    .trim(),
+  
+  body('subcategories.*.isActive')
+    .optional()
+    .isBoolean()
+    .withMessage('Subcategory isActive must be a boolean'),
+];
+
 // Create category validation
 export const validateCreateCategory = [
   body('name')
@@ -46,6 +73,9 @@ export const validateCreateCategory = [
     .optional()
     .isBoolean()
     .withMessage('isActive must be a boolean'),
+  
+  // Add subcategory validation
+  ...validateSubcategory,
   
   handleValidationErrors
 ];
@@ -77,6 +107,9 @@ export const validateUpdateCategory = [
     .isBoolean()
     .withMessage('isActive must be a boolean'),
   
+  // Add subcategory validation
+  ...validateSubcategory,
+  
   handleValidationErrors
 ];
 
@@ -85,6 +118,19 @@ export const validateCategoryId = [
   param('id')
     .isMongoId()
     .withMessage('Invalid category ID format'),
+  
+  handleValidationErrors
+];
+
+// Subcategory ID parameter validation
+export const validateSubcategoryId = [
+  param('categoryId')
+    .isMongoId()
+    .withMessage('Invalid category ID format'),
+  
+  param('subcategoryId')
+    .isMongoId()
+    .withMessage('Invalid subcategory ID format'),
   
   handleValidationErrors
 ]; 

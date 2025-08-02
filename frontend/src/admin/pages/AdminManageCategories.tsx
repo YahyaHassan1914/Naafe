@@ -77,7 +77,7 @@ const addCategory = async (data: { name: string; description: string; icon: stri
 const editCategory = async (id: string, data: { name: string; description: string; icon: string }, token: string | null) => {
   console.debug('[editCategory] token:', token, 'id:', id, 'payload:', data);
   const res = await fetch(`/api/categories/${id}`, {
-    method: 'PATCH',
+    method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
