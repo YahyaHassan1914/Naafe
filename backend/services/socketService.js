@@ -122,6 +122,28 @@ class SocketService {
         }
       });
 
+      // Handle join-offer event
+      socket.on('join-offer', async (data) => {
+        try {
+          await this.handleJoinOffer(socket, data);
+        } catch (error) {
+          logger.error('Error handling join-offer:', error);
+          socket.emit('error', {
+            message: 'Failed to join offer',
+            error: error.message
+          });
+        }
+      });
+
+      // Handle leave-offer event
+      socket.on('leave-offer', (data) => {
+        try {
+          this.handleLeaveOffer(socket, data);
+        } catch (error) {
+          logger.error('Error handling leave-offer:', error);
+        }
+      });
+
       // Handle disconnect
       socket.on('disconnect', () => {
         logger.info(`User disconnected: ${socket.userId}`);
@@ -159,26 +181,25 @@ class SocketService {
       const notification = new Notification({
         userId: receiverId,
         type: 'new_message',
+        title: 'رسالة جديدة',
         message: `${senderName} أرسل لك رسالة جديدة`,
-        relatedChatId: conversationId,
+        data: { conversationId },
         isRead: false
       });
       await notification.save();
 
       // Emit notification to receiver if online
-      const receiverSocketId = this.connectedUsers.get(receiverId);
-      if (receiverSocketId) {
-        this.io.to(receiverSocketId).emit('notify:newMessage', {
-          notification: {
-            _id: notification._id,
-            type: notification.type,
-            message: notification.message,
-            relatedChatId: notification.relatedChatId,
-            isRead: notification.isRead,
-            createdAt: notification.createdAt
-          }
-        });
-      }
+      this.emitToUser(receiverId, 'notify:newMessage', {
+        notification: {
+          _id: notification._id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          data: notification.data,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt
+        }
+      });
 
       logger.info(`Notification created for new message: ${notification._id}`);
     } catch (error) {
@@ -201,7 +222,6 @@ class SocketService {
     socket.emit('message-sent', messageData);
 
     // Emit to conversation room for real-time delivery (excluding sender)
-    // The sender will receive the message via message-sent event above
     socket.to(`conversation:${conversationId}`).emit('receive-message', messageData);
 
     logger.info(`Message sent via socket: ${message._id} from ${senderId} to ${receiverId}`);
@@ -264,6 +284,41 @@ class SocketService {
   }
 
   /**
+   * Handle join-offer event
+   */
+  async handleJoinOffer(socket, data) {
+    const { offerId } = data;
+    const userId = socket.userId;
+
+    // Import offerService dynamically to avoid circular dependency
+    const { default: offerService } = await import('./offerService.js');
+    
+    // Check if user can access this offer
+    try {
+      await offerService.getOfferById(offerId, userId);
+      
+      // Join offer room
+      socket.join(`offer:${offerId}`);
+      
+      logger.info(`User ${userId} joined offer: ${offerId}`);
+    } catch (error) {
+      throw new Error('Access denied to this offer');
+    }
+  }
+
+  /**
+   * Handle leave-offer event
+   */
+  handleLeaveOffer(socket, data) {
+    const { offerId } = data;
+    
+    // Leave offer room
+    socket.leave(`offer:${offerId}`);
+    
+    logger.info(`User ${socket.userId} left offer: ${offerId}`);
+  }
+
+  /**
    * Get socket instance
    */
   getIO() {
@@ -304,108 +359,238 @@ class SocketService {
   }
 
   /**
-   * Send payment notification to users
+   * Send offer notification to seeker
    */
-  async sendPaymentNotification(offerId, paymentId, seekerId, providerId) {
+  async sendOfferNotification(offerId, providerId, seekerId) {
     try {
-      // Create notification for provider
+      const provider = await User.findById(providerId).select('name.first name.last');
+      const providerName = provider ? `${provider.name.first} ${provider.name.last}` : 'مقدم خدمة';
+      
       const notification = new Notification({
-        userId: providerId,
-        type: 'payment_completed',
-        message: 'تم إيداع الضمان للخدمة',
-        relatedOfferId: offerId,
-        relatedPaymentId: paymentId,
+        userId: seekerId,
+        type: 'new_offer',
+        title: 'عرض جديد',
+        message: `${providerName} أرسل لك عرض جديد`,
+        data: { offerId },
         isRead: false
       });
       await notification.save();
       
-      // Emit to both users
-      this.emitToUsers([seekerId, providerId], 'payment:completed', {
-        offerId,
-        paymentId,
-        timestamp: new Date()
-      });
-      
-      // Emit notification to provider
-      this.emitToUser(providerId, 'notify:paymentCompleted', {
+      // Emit notification to seeker
+      this.emitToUser(seekerId, 'notify:newOffer', {
         notification: {
           _id: notification._id,
           type: notification.type,
+          title: notification.title,
           message: notification.message,
-          relatedOfferId: notification.relatedOfferId,
-          relatedPaymentId: notification.relatedPaymentId,
+          data: notification.data,
           isRead: notification.isRead,
           createdAt: notification.createdAt
         }
       });
       
-      logger.info(`Payment notification sent for offer: ${offerId}, payment: ${paymentId}`);
+      // Emit to offer room for real-time updates
+      this.emitToOffer(offerId, 'offer:created', {
+        offerId,
+        providerId,
+        timestamp: new Date()
+      });
+      
+      logger.info(`Offer notification sent for offer: ${offerId}`);
+    } catch (error) {
+      logger.error('Error sending offer notification:', error);
+    }
+  }
+
+  /**
+   * Send offer acceptance notification to provider
+   */
+  async sendOfferAcceptanceNotification(offerId, seekerId, providerId) {
+    try {
+      const seeker = await User.findById(seekerId).select('name.first name.last');
+      const seekerName = seeker ? `${seeker.name.first} ${seeker.name.last}` : 'طالب الخدمة';
+      
+      const notification = new Notification({
+        userId: providerId,
+        type: 'offer_accepted',
+        title: 'عرض مقبول',
+        message: `${seekerName} قبل عرضك`,
+        data: { offerId },
+        isRead: false
+      });
+      await notification.save();
+      
+      // Emit notification to provider
+      this.emitToUser(providerId, 'notify:offerAccepted', {
+        notification: {
+          _id: notification._id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          data: notification.data,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt
+        }
+      });
+      
+      // Emit to offer room for real-time updates
+      this.emitToOffer(offerId, 'offer:accepted', {
+        offerId,
+        seekerId,
+        timestamp: new Date()
+      });
+      
+      logger.info(`Offer acceptance notification sent for offer: ${offerId}`);
+    } catch (error) {
+      logger.error('Error sending offer acceptance notification:', error);
+    }
+  }
+
+  /**
+   * Send payment notification to users
+   */
+  async sendPaymentNotification(paymentId, seekerId, providerId) {
+    try {
+      // Create notification for provider
+      const notification = new Notification({
+        userId: providerId,
+        type: 'payment_created',
+        title: 'دفع جديد',
+        message: 'تم إنشاء دفعة جديدة للخدمة',
+        data: { paymentId },
+        isRead: false
+      });
+      await notification.save();
+      
+      // Emit to both users
+      this.emitToUsers([seekerId, providerId], 'payment:created', {
+        paymentId,
+        timestamp: new Date()
+      });
+      
+      // Emit notification to provider
+      this.emitToUser(providerId, 'notify:paymentCreated', {
+        notification: {
+          _id: notification._id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          data: notification.data,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt
+        }
+      });
+      
+      logger.info(`Payment notification sent for payment: ${paymentId}`);
     } catch (error) {
       logger.error('Error sending payment notification:', error);
     }
   }
 
   /**
-   * Send service completion notification to users
+   * Send payment completion notification to users
    */
-  async sendServiceCompletionNotification(offerId, paymentId, seekerId, providerId) {
+  async sendPaymentCompletionNotification(paymentId, seekerId, providerId) {
     try {
       // Create notification for both users
       const providerNotification = new Notification({
         userId: providerId,
-        type: 'service_completed',
-        message: 'تم اكتمال الخدمة وتحرير المبلغ',
-        relatedOfferId: offerId,
-        relatedPaymentId: paymentId,
+        type: 'payment_completed',
+        title: 'دفع مكتمل',
+        message: 'تم اكتمال الدفع للخدمة',
+        data: { paymentId },
         isRead: false
       });
       await providerNotification.save();
       
       const seekerNotification = new Notification({
         userId: seekerId,
-        type: 'service_completed',
-        message: 'تم اكتمال الخدمة وتحرير المبلغ لمقدم الخدمة',
-        relatedOfferId: offerId,
-        relatedPaymentId: paymentId,
+        type: 'payment_completed',
+        title: 'دفع مكتمل',
+        message: 'تم اكتمال الدفع للخدمة',
+        data: { paymentId },
         isRead: false
       });
       await seekerNotification.save();
       
       // Emit to both users
-      this.emitToUsers([seekerId, providerId], 'service:completed', {
-        offerId,
+      this.emitToUsers([seekerId, providerId], 'payment:completed', {
         paymentId,
         timestamp: new Date()
       });
       
       // Emit notifications
-      this.emitToUser(providerId, 'notify:serviceCompleted', {
+      this.emitToUser(providerId, 'notify:paymentCompleted', {
         notification: {
           _id: providerNotification._id,
           type: providerNotification.type,
+          title: providerNotification.title,
           message: providerNotification.message,
-          relatedOfferId: providerNotification.relatedOfferId,
-          relatedPaymentId: providerNotification.relatedPaymentId,
+          data: providerNotification.data,
           isRead: providerNotification.isRead,
           createdAt: providerNotification.createdAt
         }
       });
       
-      this.emitToUser(seekerId, 'notify:serviceCompleted', {
+      this.emitToUser(seekerId, 'notify:paymentCompleted', {
         notification: {
           _id: seekerNotification._id,
           type: seekerNotification.type,
+          title: seekerNotification.title,
           message: seekerNotification.message,
-          relatedOfferId: seekerNotification.relatedOfferId,
-          relatedPaymentId: seekerNotification.relatedPaymentId,
+          data: seekerNotification.data,
           isRead: seekerNotification.isRead,
           createdAt: seekerNotification.createdAt
         }
       });
       
-      logger.info(`Service completion notification sent for offer: ${offerId}, payment: ${paymentId}`);
+      logger.info(`Payment completion notification sent for payment: ${paymentId}`);
     } catch (error) {
-      logger.error('Error sending service completion notification:', error);
+      logger.error('Error sending payment completion notification:', error);
+    }
+  }
+
+  /**
+   * Send negotiation notification
+   */
+  async sendNegotiationNotification(offerId, senderId, receiverId) {
+    try {
+      const sender = await User.findById(senderId).select('name.first name.last');
+      const senderName = sender ? `${sender.name.first} ${sender.name.last}` : 'شخص ما';
+      
+      const notification = new Notification({
+        userId: receiverId,
+        type: 'negotiation_message',
+        title: 'رسالة تفاوض',
+        message: `${senderName} أرسل رسالة تفاوض جديدة`,
+        data: { offerId },
+        isRead: false
+      });
+      await notification.save();
+      
+      // Emit notification to receiver
+      this.emitToUser(receiverId, 'notify:negotiationMessage', {
+        notification: {
+          _id: notification._id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          data: notification.data,
+          isRead: notification.isRead,
+          createdAt: notification.createdAt
+        }
+      });
+      
+      // Emit to offer room for real-time updates
+      this.emitToOffer(offerId, 'negotiation:message', {
+        offerId,
+        senderId,
+        timestamp: new Date()
+      });
+      
+      logger.info(`Negotiation notification sent for offer: ${offerId}`);
+    } catch (error) {
+      logger.error('Error sending negotiation notification:', error);
     }
   }
 
@@ -414,6 +599,13 @@ class SocketService {
    */
   emitToConversation(conversationId, event, data) {
     this.io.to(`conversation:${conversationId}`).emit(event, data);
+  }
+
+  /**
+   * Emit to offer room
+   */
+  emitToOffer(offerId, event, data) {
+    this.io.to(`offer:${offerId}`).emit(event, data);
   }
 }
 

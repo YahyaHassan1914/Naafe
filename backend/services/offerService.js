@@ -90,6 +90,15 @@ class OfferService {
         { path: 'requestId', select: 'category subcategory description urgency location' }
       ]);
 
+      // Send real-time notification to seeker
+      try {
+        const { default: socketService } = await import('./socketService.js');
+        await socketService.sendOfferNotification(offer._id, providerId, serviceRequest.seekerId);
+      } catch (error) {
+        logger.error('Error sending offer notification:', error);
+        // Don't throw error here as the offer was already created successfully
+      }
+
       return offer;
     } catch (error) {
       logger.error(`Error creating offer: ${error.message}`);
@@ -299,6 +308,15 @@ class OfferService {
         { status: 'rejected' }
       );
 
+      // Send real-time notification to provider
+      try {
+        const { default: socketService } = await import('./socketService.js');
+        await socketService.sendOfferAcceptanceNotification(offer._id, userId, offer.providerId.toString());
+      } catch (error) {
+        logger.error('Error sending offer acceptance notification:', error);
+        // Don't throw error here as the offer was already accepted successfully
+      }
+
       logger.info(`Offer accepted: ${offerId}`);
       return offer;
     } catch (error) {
@@ -422,6 +440,16 @@ class OfferService {
       // Update offer status to negotiating
       offer.status = 'negotiating';
       await offer.save();
+
+      // Send real-time notification to the other participant
+      try {
+        const { default: socketService } = await import('./socketService.js');
+        const receiverId = isProvider ? offer.requestId.seekerId.toString() : offer.providerId.toString();
+        await socketService.sendNegotiationNotification(offer._id, userId, receiverId);
+      } catch (error) {
+        logger.error('Error sending negotiation notification:', error);
+        // Don't throw error here as the negotiation was already added successfully
+      }
 
       logger.info(`Negotiation added to offer: ${offerId}`);
       return offer;

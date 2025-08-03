@@ -1,508 +1,410 @@
-import mongoose from 'mongoose';
 import Payment from '../models/Payment.js';
-import Conversation from '../models/Conversation.js';
-import JobRequest from '../models/JobRequest.js';
-import User from '../models/User.js';
 import Offer from '../models/Offer.js';
-import offerService from './offerService.js';
-import socketService from './socketService.js';
-import dotenv from 'dotenv';
-import Stripe from 'stripe';
+import ServiceRequest from '../models/JobRequest.js';
+import User from '../models/User.js';
+import { logger } from '../middlewares/logging.middleware.js';
 
-dotenv.config();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2023-10-16',
-});
-
-export const getPaymentBySessionId = async (sessionId) => {
-  try {
-    const payment = await Payment.findBySessionId(sessionId)
-      .populate('conversationId')
-      .populate('jobRequestId')
-      .populate('offerId')
-      .populate('seekerId', 'name email')
-      .populate('providerId', 'name email');
-    
-    return { success: true, data: payment };
-  } catch (error) {
-    console.error('Error getting payment by session ID:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const getPaymentsByConversation = async (conversationId, userId) => {
-  try {
-    // Verify user has access to this conversation
-    const conversation = await Conversation.findById(conversationId);
-    if (!conversation) {
-      return { success: false, error: 'المحادثة غير موجودة' };
-    }
-
-    const isSeeker = conversation.participants.seeker.toString() === userId;
-    const isProvider = conversation.participants.provider.toString() === userId;
-
-    if (!isSeeker && !isProvider) {
-      return { success: false, error: 'غير مصرح لك بالوصول لهذه المحادثة' };
-    }
-
-    const payments = await Payment.findByConversation(conversationId)
-      .populate('seekerId', 'name email')
-      .populate('providerId', 'name email')
-      .populate('offerId');
-
-    return { success: true, data: payments };
-  } catch (error) {
-    console.error('Error getting payments by conversation:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const getUserPayments = async (userId, page = 1, limit = 10) => {
-  try {
-    const skip = (page - 1) * limit;
-    
-    const payments = await Payment.find({
-      $or: [
-        { seekerId: userId },
-        { providerId: userId }
-      ]
-    })
-    .populate('conversationId')
-    .populate('jobRequestId')
-    .populate('offerId')
-    .populate('seekerId', 'name email')
-    .populate('providerId', 'name email')
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
-
-    const total = await Payment.countDocuments({
-      $or: [
-        { seekerId: userId },
-        { providerId: userId }
-      ]
-    });
-
-    return {
-      success: true,
-      data: {
-        payments,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Error getting user payments:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const getPaymentStats = async (userId) => {
-  try {
-    const stats = await Payment.aggregate([
-      {
-        $match: {
-          $or: [
-            { seekerId: new mongoose.Types.ObjectId(userId) },
-            { providerId: new mongoose.Types.ObjectId(userId) }
-          ]
-        }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalAmount: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    const totalPayments = stats.reduce((acc, stat) => acc + stat.count, 0);
-    const totalAmount = stats.reduce((acc, stat) => acc + stat.totalAmount, 0);
-
-    return {
-      success: true,
-      data: {
-        stats,
-        totalPayments,
-        totalAmount: totalAmount / 100 // Convert from cents
-      }
-    };
-  } catch (error) {
-    console.error('Error getting payment stats:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const validateEscrowPaymentRequest = async (offerId, userId, amount) => {
-  try {
-    // Convert userId to string if it's an ObjectId
-    const userIdStr = typeof userId === 'object' ? userId.toString() : userId;
-    
-    // Find the offer and check all validation rules
-    const offer = await Offer.findById(offerId)
-      .populate('jobRequest')
-      .populate('conversation');
-
-    if (!offer) {
-      return { success: false, error: 'العرض غير موجود' };
-    }
-
-    // Convert seeker ID to string for comparison
-    const seekerIdStr = offer.jobRequest.seeker.toString();
-
-    // Log for debugging
-    console.log('Validating escrow payment request:', {
-      offerId,
-      userId: userIdStr,
-      seekerIdStr,
-      'userId === seekerId': userIdStr === seekerIdStr,
-      amount,
-      'offer.status': offer.status,
-      'offer.negotiation.price': offer.negotiation?.price
-    });
-
-    // Check if user is the seeker (compare as strings to ensure proper comparison)
-    if (seekerIdStr !== userIdStr) {
-      console.log('Authorization failure: User is not the seeker', { 
-        userIdStr, 
-        seekerIdStr,
-        userIdType: typeof userIdStr,
-        seekerIdType: typeof seekerIdStr
-      });
-      return { success: false, error: 'فقط طالب الخدمة يمكنه إنشاء الدفع' };
-    }
-
-    // Check if offer is accepted (proper status for escrow)
-    if (offer.status !== 'accepted') {
-      console.log('Offer status check failed:', offer.status);
-      return { success: false, error: 'يمكن إجراء الدفع فقط للعروض المقبولة' };
-    }
-
-    // Check if offer already has a payment
-    if (offer.payment && offer.payment.paymentId) {
-      const existingPayment = await Payment.findById(offer.payment.paymentId);
-      if (existingPayment && ['pending', 'escrowed'].includes(existingPayment.status)) {
-        return { success: false, error: 'يوجد دفع بالفعل لهذا العرض' };
-      }
-    }
-
-    // Check if negotiation is complete with agreed price
-    if (!offer.negotiation || !offer.negotiation.price) {
-      return { success: false, error: 'يجب الاتفاق على السعر قبل الدفع' };
-    }
-
-    // Validate amount matches negotiated price
-    if (!amount || amount <= 0) {
-      return { success: false, error: 'المبلغ غير صحيح' };
-    }
-
-    // Make sure the payment amount matches the negotiated price
-    if (Math.abs(amount - offer.negotiation.price) > 1) { // Allow small rounding differences
-      return { success: false, error: 'المبلغ لا يتطابق مع السعر المتفق عليه' };
-    }
-
-    return { 
-      success: true, 
-      data: { 
-        offer,
-        conversation: offer.conversation,
-        jobRequest: offer.jobRequest
-      }
-    };
-  } catch (error) {
-    console.error('Error validating escrow payment request:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const handleEscrowPaymentCompletion = async (session) => {
-  try {
-    const payment = await Payment.findOne({ stripeSessionId: session.id });
-    if (!payment) {
-      console.error('Payment record not found for session:', session.id);
-      return { success: false, error: 'Payment record not found' };
-    }
-
-    // Mark payment as escrowed
-    payment.status = 'escrowed';
-    payment.stripePaymentIntentId = session.payment_intent;
-    payment.escrow.status = 'held';
-    payment.escrow.heldAt = new Date();
-    await payment.save();
-
-    // Update offer payment status and move to in_progress
-    const result = await offerService.processEscrowPayment(payment.offerId, payment._id);
-    
-    // Send real-time notification to both users
-    await socketService.sendPaymentNotification(
-      payment.offerId.toString(),
-      payment._id.toString(),
-      payment.seekerId.toString(),
-      payment.providerId.toString()
-    );
-
-    return { success: true, payment, offer: result };
-  } catch (error) {
-    console.error('Error handling escrow payment completion:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const releaseFundsFromEscrow = async (paymentId, userId) => {
-  try {
-    const payment = await Payment.findById(paymentId)
-      .populate({
-        path: 'offerId',
-        populate: {
-          path: 'jobRequest'
-        }
-      });
-
-    if (!payment) {
-      return { success: false, error: 'الدفع غير موجود' };
-    }
-
-    // Check if payment is in escrow
-    if (payment.status !== 'escrowed' || payment.escrow.status !== 'held') {
-      return { success: false, error: 'المبلغ غير موجود في الضمان' };
-    }
-
-    // Check authorization - only the seeker who made the payment can release funds
-    if (payment.seekerId.toString() !== userId) {
-      return { success: false, error: 'غير مصرح لك بتحرير الأموال من الضمان' };
-    }
-
-    // Update offer and release funds
-    await offerService.markServiceCompleted(payment.offerId._id, userId);
-    
-    // Process payout to provider
-    console.log(`Processing payout for completed service, payment ID: ${payment._id}`);
-    const payoutResult = await createProviderPayout(payment._id);
-    
-    // Send real-time notification to both users
-    await socketService.sendServiceCompletionNotification(
-      payment.offerId._id.toString(),
-      payment._id.toString(),
-      payment.seekerId.toString(),
-      payment.providerId.toString()
-    );
-    
-    if (!payoutResult.success) {
-      console.error(`Payout failed for payment ${payment._id}: ${payoutResult.error}`);
-      // Note: We don't fail the entire operation if payout fails - 
-      // admin can manually process it later, but we log the error
-    }
-
-    return { 
-      success: true, 
-      message: 'تم تحرير الأموال من الضمان بنجاح',
-      payout: payoutResult.success ? payoutResult.data : null 
-    };
-  } catch (error) {
-    console.error('Error releasing funds from escrow:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const requestCancellation = async (offerId, userId, reason) => {
-  try {
-    const result = await offerService.requestCancellation(offerId, userId, reason);
-    return { success: true, data: result };
-  } catch (error) {
-    console.error('Error requesting cancellation:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const processCancellation = async (offerId, adminId = null) => {
-  try {
-    const result = await offerService.processCancellation(offerId, adminId);
-    
-    // Process refund if payment exists and was escrowed
-    if (result.success && result.data) {
-      const offer = result.data;
-      
-      // Check if there's a payment associated with this offer
-      const payment = await Payment.findOne({ offerId });
-      
-      if (payment && payment.status === 'escrowed' && !payment.stripeRefundId) {
-        console.log(`Processing refund for cancelled offer ${offerId}, payment ID: ${payment._id}`);
-        
-        // Get refund percentage from cancellation data
-        const refundPercentage = offer.cancellation?.refundPercentage || 100;
-        
-        // Process the refund
-        const refundResult = await processRefund(payment._id, refundPercentage);
-        
-        if (!refundResult.success) {
-          console.error(`Refund failed for payment ${payment._id}: ${refundResult.error}`);
-          // Note: We still return success for the overall operation, 
-          // but include the refund failure in the response
-          return {
-            success: true,
-            data: result.data,
-            refund: { success: false, error: refundResult.error }
-          };
-        }
-        
-        return {
-          success: true,
-          data: result.data,
-          refund: refundResult.data
-        };
-      }
-    }
-    
-    return { success: result.success, data: result.data };
-  } catch (error) {
-    console.error('Error processing cancellation:', error);
-    return { success: false, error: error.message };
-  }
-}; 
-
-/**
- * Create a payout to a provider after service completion
- * @param {string} paymentId - The payment ID to process payout for
- * @returns {Object} Success status and payout details
- */
-export const createProviderPayout = async (paymentId) => {
-  try {
-    console.log(`[FINANCIAL] Creating provider payout for payment: ${paymentId}`);
-    
-    // Find payment
-    const payment = await Payment.findById(paymentId);
-    if (!payment) {
-      console.error(`Payment not found: ${paymentId}`);
-      return { success: false, error: 'Payment not found' };
-    }
-    
-    // Check if payment is already paid out or not in a state for payout
-    if (payment.stripePayoutId) {
-      console.warn(`Payout already processed for payment: ${paymentId}, ID: ${payment.stripePayoutId}`);
-      return { success: true, data: { alreadyProcessed: true, payoutId: payment.stripePayoutId } };
-    }
-    
-    // Get payout amount (either from payout object or full amount)
-    const payoutAmount = payment.payout?.amount || payment.amount;
-    
-    // Create a payout in Stripe (in test mode, this simulates a bank transfer)
-    console.log(`Creating payout for ${payoutAmount} ${payment.currency}`);
-    const payout = await stripe.payouts.create({
-      amount: payoutAmount,
-      currency: payment.currency,
-      statement_descriptor: `Service: ${payment.serviceTitle.substring(0, 15)}`,
-      metadata: {
-        paymentId: payment._id.toString(),
-        offerId: payment.offerId.toString(),
-        providerId: payment.providerId.toString(),
-        serviceTitle: payment.serviceTitle
-      }
-    });
-    
-    console.log(`[FINANCIAL] ${new Date().toISOString()} - PAYOUT - ID: ${payout.id} - Amount: ${payoutAmount} - Status: ${payout.status}`);
-    
-    // Update payment with payout info
-    payment.stripePayoutId = payout.id;
-    payment.payout = {
-      ...payment.payout,
-      status: 'processed',
-      processedAt: new Date()
-    };
-    await payment.save();
-    
-    return { success: true, data: { payout } };
-  } catch (error) {
-    console.error('Error creating provider payout:', error);
-    
-    // Update payment with failure info if possible
+class PaymentService {
+  /**
+   * Create a new payment for a service
+   * @param {Object} paymentData - Payment data
+   * @param {string} seekerId - ID of the seeker making the payment
+   * @returns {Object} Created payment
+   */
+  async createPayment(paymentData, seekerId) {
     try {
-      if (paymentId) {
-        const payment = await Payment.findById(paymentId);
-        if (payment) {
-          payment.payout = {
-            ...payment.payout,
-            status: 'failed',
-            failedAt: new Date(),
-            failureReason: error.message
-          };
-          await payment.save();
+      logger.info(`Creating payment for service request: ${paymentData.requestId} by seeker: ${seekerId}`);
+      
+      // Verify seeker exists
+      const seeker = await User.findById(seekerId);
+      if (!seeker || seeker.role !== 'seeker') {
+        throw new Error('Seeker not found or not authorized');
+      }
+
+      // Verify offer exists and is accepted
+      const offer = await Offer.findById(paymentData.offerId)
+        .populate('requestId')
+        .populate('providerId');
+      
+      if (!offer) {
+        throw new Error('Offer not found');
+      }
+      
+      if (offer.status !== 'accepted') {
+        throw new Error('Can only create payment for accepted offers');
+      }
+
+      // Verify service request belongs to seeker
+      if (offer.requestId.seekerId.toString() !== seekerId.toString()) {
+        throw new Error('Unauthorized to create payment for this offer');
+      }
+
+      // Verify payment amount matches offer price
+      if (paymentData.amount !== offer.price) {
+        throw new Error('Payment amount must match offer price');
+      }
+
+      // Check if payment already exists for this offer
+      const existingPayment = await Payment.findOne({ offerId: paymentData.offerId });
+      if (existingPayment) {
+        throw new Error('Payment already exists for this offer');
+      }
+
+      // Calculate platform fee (5% for now, can be made configurable)
+      const platformFee = Math.round(paymentData.amount * 0.05);
+      const providerAmount = paymentData.amount - platformFee;
+
+      // Create payment with new model structure
+      const payment = new Payment({
+        requestId: paymentData.requestId,
+        offerId: paymentData.offerId,
+        seekerId: seekerId,
+        providerId: offer.providerId._id,
+        amount: paymentData.amount,
+        platformFee: platformFee,
+        providerAmount: providerAmount,
+        paymentMethod: paymentData.paymentMethod,
+        status: 'pending',
+        paymentGateway: paymentData.paymentMethod === 'stripe' ? 'stripe' : 'manual'
+      });
+
+      await payment.save();
+      logger.info(`Payment created successfully: ${payment._id}`);
+
+      // Update service request status to in_progress
+      await ServiceRequest.findByIdAndUpdate(paymentData.requestId, { 
+        status: 'in_progress' 
+      });
+
+      // Populate payment with related data
+      await payment.populate([
+        { path: 'seekerId', select: 'name email' },
+        { path: 'providerId', select: 'name email' },
+        { path: 'requestId', select: 'category subcategory description' }
+      ]);
+
+      // Send real-time notification to both users
+      try {
+        const { default: socketService } = await import('./socketService.js');
+        await socketService.sendPaymentNotification(payment._id, seekerId, offer.providerId._id.toString());
+      } catch (error) {
+        logger.error('Error sending payment notification:', error);
+        // Don't throw error here as the payment was already created successfully
+      }
+
+      return payment;
+    } catch (error) {
+      logger.error(`Error creating payment: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get payment by ID
+   * @param {string} paymentId - Payment ID
+   * @param {string} userId - User ID for authorization
+   * @returns {Object} Payment with populated data
+   */
+  async getPaymentById(paymentId, userId) {
+    try {
+      const payment = await Payment.findById(paymentId)
+        .populate('seekerId', 'name email')
+        .populate('providerId', 'name email')
+        .populate('requestId', 'category subcategory description');
+
+      if (!payment) {
+        throw new Error('Payment not found');
+      }
+
+      // Check authorization
+      const user = await User.findById(userId);
+      const isAuthorized = 
+        user.role === 'admin' ||
+        payment.seekerId._id.toString() === userId.toString() ||
+        payment.providerId._id.toString() === userId.toString();
+
+      if (!isAuthorized) {
+        throw new Error('Unauthorized to view this payment');
+      }
+
+      return payment;
+    } catch (error) {
+      logger.error(`Error getting payment: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Update payment status (for manual payments)
+   * @param {string} paymentId - Payment ID
+   * @param {Object} updateData - Update data
+   * @param {string} adminId - Admin ID
+   * @returns {Object} Updated payment
+   */
+  async updatePaymentStatus(paymentId, updateData, adminId) {
+    try {
+      const payment = await Payment.findById(paymentId);
+      if (!payment) {
+        throw new Error('Payment not found');
+      }
+
+      // Only allow status updates for manual payments
+      if (payment.paymentGateway !== 'manual') {
+        throw new Error('Can only update status for manual payments');
+      }
+
+      // Update payment status
+      payment.status = updateData.status;
+      payment.verificationDate = new Date();
+      payment.verifiedBy = adminId;
+      
+      if (updateData.verificationNotes) {
+        payment.verificationNotes = updateData.verificationNotes;
+      }
+
+      await payment.save();
+      logger.info(`Payment status updated: ${paymentId} to ${updateData.status}`);
+
+      // If payment is completed, update service request status
+      if (updateData.status === 'completed') {
+        await ServiceRequest.findByIdAndUpdate(payment.requestId, { 
+          status: 'completed',
+          completedAt: new Date()
+        });
+
+        // Send real-time notification to both users
+        try {
+          const { default: socketService } = await import('./socketService.js');
+          await socketService.sendPaymentCompletionNotification(payment._id, payment.seekerId.toString(), payment.providerId.toString());
+        } catch (error) {
+          logger.error('Error sending payment completion notification:', error);
+          // Don't throw error here as the payment was already updated successfully
         }
       }
-    } catch (updateError) {
-      console.error('Error updating payment after payout failure:', updateError);
-    }
-    
-    return { success: false, error: error.message };
-  }
-}; 
 
-/**
- * Process a refund for a cancelled payment
- * @param {string} paymentId - The payment ID to refund
- * @param {number} refundPercentage - Percentage of original payment to refund (0-100)
- * @returns {Object} Success status and refund details
- */
-export const processRefund = async (paymentId, refundPercentage) => {
-  try {
-    console.log(`[FINANCIAL] Processing refund for payment: ${paymentId}, ${refundPercentage}%`);
-    
-    // Find payment
-    const payment = await Payment.findById(paymentId);
-    if (!payment) {
-      console.error(`Payment not found: ${paymentId}`);
-      return { success: false, error: 'Payment not found' };
+      return payment;
+    } catch (error) {
+      logger.error(`Error updating payment status: ${error.message}`);
+      throw error;
     }
-    
-    // Check if payment is already refunded
-    if (payment.stripeRefundId) {
-      console.warn(`Refund already processed for payment: ${paymentId}, ID: ${payment.stripeRefundId}`);
-      return { success: true, data: { alreadyProcessed: true, refundId: payment.stripeRefundId } };
-    }
-    
-    // Check if payment has a payment intent
-    if (!payment.stripePaymentIntentId) {
-      console.error(`Payment ${paymentId} has no payment intent ID`);
-      return { success: false, error: 'Payment has no payment intent ID' };
-    }
-    
-    // Calculate refund amount
-    const refundAmount = Math.round(payment.amount * (refundPercentage / 100));
-    console.log(`Calculated refund amount: ${refundAmount} of ${payment.amount} (${refundPercentage}%)`);
-    
-    // Process the refund through Stripe
-    const refund = await stripe.refunds.create({
-      payment_intent: payment.stripePaymentIntentId,
-      amount: refundAmount,
-      metadata: {
-        paymentId: payment._id.toString(),
-        offerId: payment.offerId.toString(),
-        refundPercentage: refundPercentage.toString(),
-        reason: payment.cancellation?.reason || 'Service cancelled'
-      }
-    });
-    
-    console.log(`[FINANCIAL] ${new Date().toISOString()} - REFUND - ID: ${refund.id} - Amount: ${refundAmount} - Status: ${refund.status}`);
-    
-    // Update payment with refund info
-    payment.stripeRefundId = refund.id;
-    await payment.save();
-    
-    // If partial refund, create payout for provider's compensation
-    if (refundPercentage < 100) {
-      const providerAmount = payment.amount - refundAmount;
-      if (providerAmount > 0) {
-        await createProviderPayout(paymentId);
-      }
-    }
-    
-    return { success: true, data: { refund } };
-  } catch (error) {
-    console.error('Error processing refund:', error);
-    return { success: false, error: error.message };
   }
-}; 
+
+  /**
+   * Request a refund for a payment
+   * @param {string} paymentId - Payment ID
+   * @param {Object} refundData - Refund data
+   * @param {string} userId - User ID
+   * @returns {Object} Refund request details
+   */
+  async requestRefund(paymentId, refundData, userId) {
+    try {
+      const payment = await Payment.findById(paymentId);
+      if (!payment) {
+        throw new Error('Payment not found');
+      }
+
+      // Check authorization (only payment participants can request refund)
+      const isAuthorized = 
+        payment.seekerId.toString() === userId.toString() ||
+        payment.providerId.toString() === userId.toString();
+
+      if (!isAuthorized) {
+        throw new Error('Unauthorized to request refund for this payment');
+      }
+
+      // Only allow refund requests for completed payments
+      if (payment.status !== 'completed') {
+        throw new Error('Can only request refund for completed payments');
+      }
+
+      // Calculate refund amount
+      const refundAmount = refundData.amount || payment.amount;
+
+      // Create refund request
+      payment.refundRequest = {
+        requestedBy: userId,
+        requestedAt: new Date(),
+        reason: refundData.reason,
+        amount: refundAmount,
+        status: 'pending'
+      };
+
+      await payment.save();
+      logger.info(`Refund requested for payment: ${paymentId}`);
+
+      return payment;
+    } catch (error) {
+      logger.error(`Error requesting refund: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get transactions for a user
+   * @param {string} userId - User ID
+   * @param {Object} filters - Filter options
+   * @returns {Object} Object with transactions and total count
+   */
+  async getMyTransactions(userId, filters = {}) {
+    try {
+      const {
+        status,
+        paymentMethod,
+        page = 1,
+        limit = 20
+      } = filters;
+      
+      logger.info(`Getting transactions for user: ${userId}`);
+
+      let query = {
+        $or: [
+          { seekerId: userId },
+          { providerId: userId }
+        ]
+      };
+
+      // Apply filters
+      if (status) {
+        query.status = status;
+      }
+
+      if (paymentMethod) {
+        query.paymentMethod = paymentMethod;
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Execute query
+      const [transactions, total] = await Promise.all([
+        Payment.find(query)
+          .populate('seekerId', 'name email')
+          .populate('providerId', 'name email')
+          .populate('requestId', 'category subcategory description')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Payment.countDocuments(query)
+      ]);
+
+      return {
+        transactions,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      };
+    } catch (error) {
+      logger.error(`Error getting transactions: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all transactions (Admin only)
+   * @param {Object} filters - Filter options
+   * @returns {Object} Object with transactions and total count
+   */
+  async getAllTransactions(filters = {}) {
+    try {
+      const {
+        status,
+        paymentMethod,
+        userId,
+        page = 1,
+        limit = 20
+      } = filters;
+      
+      logger.info(`Getting all transactions with filters:`, filters);
+
+      let query = {};
+
+      // Apply filters
+      if (status) {
+        query.status = status;
+      }
+
+      if (paymentMethod) {
+        query.paymentMethod = paymentMethod;
+      }
+
+      if (userId) {
+        query.$or = [
+          { seekerId: userId },
+          { providerId: userId }
+        ];
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Execute query
+      const [transactions, total] = await Promise.all([
+        Payment.find(query)
+          .populate('seekerId', 'name email')
+          .populate('providerId', 'name email')
+          .populate('requestId', 'category subcategory description')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Payment.countDocuments(query)
+      ]);
+
+      return {
+        transactions,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      };
+    } catch (error) {
+      logger.error(`Error getting all transactions: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle payment webhook (Stripe, etc.)
+   * @param {Object} webhookData - Webhook data
+   * @returns {Object} Webhook processing result
+   */
+  async handleWebhook(webhookData) {
+    try {
+      logger.info(`Processing payment webhook: ${webhookData.type}`);
+      
+      // This is a simplified webhook handler
+      // In production, you would verify the webhook signature
+      // and handle different webhook types (payment_intent.succeeded, etc.)
+      
+      if (webhookData.type === 'payment_intent.succeeded') {
+        const paymentIntent = webhookData.data.object;
+        
+        // Find payment by transaction ID
+        const payment = await Payment.findOne({ 
+          transactionId: paymentIntent.id 
+        });
+        
+        if (payment) {
+          payment.status = 'completed';
+          payment.paymentDate = new Date();
+          await payment.save();
+          
+          // Update service request status
+          await ServiceRequest.findByIdAndUpdate(payment.requestId, { 
+            status: 'completed',
+            completedAt: new Date()
+          });
+          
+          logger.info(`Payment completed via webhook: ${payment._id}`);
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      logger.error(`Error processing webhook: ${error.message}`);
+      throw error;
+    }
+  }
+}
+
+export default new PaymentService(); 
