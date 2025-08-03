@@ -38,9 +38,29 @@ const offerSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'expired'],
+    enum: ['pending', 'negotiating', 'accepted', 'rejected', 'expired'],
     default: 'pending'
   },
+  negotiations: [{
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    message: {
+      type: String,
+      required: true,
+      maxlength: 500
+    },
+    counterPrice: {
+      type: Number,
+      min: 0
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   expiresAt: {
     type: Date,
     default: function() {

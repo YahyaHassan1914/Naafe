@@ -1,7 +1,7 @@
 import express from 'express';
 const router = express.Router();
 import offerController from '../controllers/offerController.js';
-import { authenticateToken, requireRole } from '../middlewares/auth.middleware.js';
+import { authenticateToken, requireSeeker, requireProvider, requireVerified } from '../middlewares/auth.middleware.js';
 import { 
   updateOfferValidation, 
   offerIdValidation, 
@@ -11,10 +11,10 @@ import {
 /**
  * @route   GET /api/offers
  * @desc    Retrieve all offers (with filtering)
- * @access  Private (Providers can see their own offers, Seekers can see offers on their jobs)
+ * @access  Private (Providers can see their own offers, Seekers can see offers on their requests)
  * @query   {string} [status] - Filter by offer status (pending, accepted, rejected, withdrawn)
- * @query   {string} [jobRequest] - Filter by job request ID
- * @query   {string} [provider] - Filter by provider ID
+ * @query   {string} [requestId] - Filter by service request ID
+ * @query   {string} [providerId] - Filter by provider ID
  * @returns {object} Array of offers with populated details
  */
 router.get('/', 
@@ -25,9 +25,9 @@ router.get('/',
 /**
  * @route   GET /api/offers/:offerId
  * @desc    Get a specific offer by ID
- * @access  Private (Offer owner, job request owner, or admin)
+ * @access  Private (Offer owner, service request owner, or admin)
  * @param   {string} offerId - ID of the offer
- * @returns {object} Offer details with populated provider and job request information
+ * @returns {object} Offer details with populated provider and service request information
  */
 router.get('/:offerId', 
   authenticateToken, 
@@ -37,18 +37,41 @@ router.get('/:offerId',
 );
 
 /**
+ * @route   POST /api/offers
+ * @desc    Create a new offer for a service request
+ * @access  Private (Verified providers only)
+ * @body    {string} requestId - Service request ID
+ * @body    {number} price - Offer price
+ * @body    {string} timeline - Estimated timeline
+ * @body    {string} scopeOfWork - Detailed scope of work
+ * @body    {boolean} materialsIncluded - Whether materials are included
+ * @body    {string} warranty - Warranty information
+ * @body    {string} paymentSchedule - Payment schedule details
+ * @returns {object} Created offer with populated details
+ */
+router.post('/', 
+  authenticateToken, 
+  requireProvider,
+  requireVerified,
+  offerController.createOffer
+);
+
+/**
  * @route   PATCH /api/offers/:offerId
  * @desc    Update an offer (only pending offers can be updated)
  * @access  Private (Offer owner only)
  * @param   {string} offerId - ID of the offer to update
- * @body    {object} [price] - Updated price object with amount and currency
- * @body    {string} [message] - Updated message from provider
- * @body    {number} [estimatedTimeDays] - Updated estimated completion time
+ * @body    {number} [price] - Updated price
+ * @body    {string} [timeline] - Updated timeline
+ * @body    {string} [scopeOfWork] - Updated scope of work
+ * @body    {boolean} [materialsIncluded] - Updated materials inclusion
+ * @body    {string} [warranty] - Updated warranty information
+ * @body    {string} [paymentSchedule] - Updated payment schedule
  * @returns {object} Updated offer with populated details
  */
 router.patch('/:offerId', 
   authenticateToken, 
-  requireRole(['provider']), 
+  requireProvider, 
   offerIdValidation,
   updateOfferValidation,
   handleValidationErrors,
@@ -57,14 +80,14 @@ router.patch('/:offerId',
 
 /**
  * @route   POST /api/offers/:offerId/accept
- * @desc    Accept an offer (only job request owner can accept)
- * @access  Private (Job request owner only)
+ * @desc    Accept an offer (only service request owner can accept)
+ * @access  Private (Service request owner only)
  * @param   {string} offerId - ID of the offer to accept
  * @returns {object} Accepted offer with updated status
  */
 router.post('/:offerId/accept', 
   authenticateToken, 
-  requireRole(['seeker']),
+  requireSeeker,
   offerIdValidation,
   handleValidationErrors,
   offerController.acceptOffer
@@ -72,14 +95,14 @@ router.post('/:offerId/accept',
 
 /**
  * @route   POST /api/offers/:offerId/reject
- * @desc    Reject an offer (only job request owner can reject)
- * @access  Private (Job request owner only)
+ * @desc    Reject an offer (only service request owner can reject)
+ * @access  Private (Service request owner only)
  * @param   {string} offerId - ID of the offer to reject
  * @returns {object} Rejected offer with updated status
  */
 router.post('/:offerId/reject', 
   authenticateToken, 
-  requireRole(['seeker']),
+  requireSeeker,
   offerIdValidation,
   handleValidationErrors,
   offerController.rejectOffer
@@ -94,113 +117,40 @@ router.post('/:offerId/reject',
  */
 router.delete('/:offerId', 
   authenticateToken, 
-  requireRole(['provider']), 
+  requireProvider, 
   offerIdValidation,
   handleValidationErrors,
   offerController.deleteOffer
 );
 
 /**
- * @route   PATCH /api/offers/:offerId/negotiation
- * @desc    Update negotiation terms for an offer
- * @access  Private (Provider or Seeker)
+ * @route   POST /api/offers/:offerId/negotiate
+ * @desc    Start negotiation on an offer
+ * @access  Private (Service request owner or offer owner)
+ * @param   {string} offerId - ID of the offer
+ * @body    {string} message - Negotiation message
+ * @body    {number} [counterPrice] - Counter offer price
+ * @returns {object} Updated offer with negotiation details
  */
-router.patch('/:offerId/negotiation',
-  authenticateToken,
-  requireRole(['provider', 'seeker']),
+router.post('/:offerId/negotiate', 
+  authenticateToken, 
   offerIdValidation,
   handleValidationErrors,
-  offerController.updateNegotiationTerms
-);
-
-/**
- * @route   POST /api/offers/:offerId/confirm-negotiation
- * @desc    Confirm negotiation terms for an offer (by either party)
- * @access  Private (Provider or Seeker)
- */
-router.post('/:offerId/confirm-negotiation',
-  authenticateToken,
-  requireRole(['provider', 'seeker']),
-  offerIdValidation,
-  handleValidationErrors,
-  offerController.confirmNegotiation
-);
-
-/**
- * @route   POST /api/offers/:offerId/reset-confirmation
- * @desc    Reset negotiation confirmations for an offer
- * @access  Private (Provider or Seeker)
- */
-router.post('/:offerId/reset-confirmation',
-  authenticateToken,
-  requireRole(['provider', 'seeker']),
-  offerIdValidation,
-  handleValidationErrors,
-  offerController.resetNegotiationConfirmation
+  offerController.negotiateOffer
 );
 
 /**
  * @route   GET /api/offers/:offerId/negotiation-history
  * @desc    Get negotiation history for an offer
- * @access  Private (Provider or Seeker)
+ * @access  Private (Offer participants only)
+ * @param   {string} offerId - ID of the offer
+ * @returns {object} Array of negotiation messages
  */
-router.get('/:offerId/negotiation-history',
-  authenticateToken,
+router.get('/:offerId/negotiation-history', 
+  authenticateToken, 
   offerIdValidation,
   handleValidationErrors,
   offerController.getNegotiationHistory
-);
-
-/**
- * @route   POST /api/offers/:offerId/process-payment
- * @desc    Process escrow payment for an offer
- * @access  Private (Seeker only)
- */
-router.post('/:offerId/process-payment',
-  authenticateToken,
-  requireRole(['seeker']),
-  offerIdValidation,
-  handleValidationErrors,
-  offerController.processEscrowPayment
-);
-
-/**
- * @route   POST /api/offers/:offerId/complete
- * @desc    Mark service as completed and release funds
- * @access  Private (Seeker only)
- */
-router.post('/:offerId/complete',
-  authenticateToken,
-  requireRole(['seeker']),
-  offerIdValidation,
-  handleValidationErrors,
-  offerController.markServiceCompleted
-);
-
-/**
- * @route   POST /api/offers/:offerId/cancel-request
- * @desc    Request service cancellation
- * @access  Private (Seeker or Provider)
- */
-router.post('/:offerId/cancel-request',
-  authenticateToken,
-  requireRole(['seeker', 'provider']),
-  offerIdValidation,
-  handleValidationErrors,
-  offerController.requestCancellation
-);
-
-/**
- * @route   POST /api/offers/:offerId/process-cancellation
- * @desc    Process cancellation request
- * @access  Private (Admin only)
- */
-router.post('/:offerId/process-cancellation',
-  authenticateToken,
-  requireRole(['admin']),
-  offerIdValidation,
-  handleValidationErrors,
-  offerController.processCancellation
 );
 
 export default router; 
