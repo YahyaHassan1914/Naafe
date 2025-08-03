@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
-import ServiceCard from '../components/ServiceCard';
-import ServiceRequestCard from '../components/ServiceRequestCard';
+import { ProviderCard, RequestCard } from '../components/ui/cards';
 import Button from '../components/ui/Button';
 import BaseCard from '../components/ui/BaseCard';
 import { useQuery } from '@tanstack/react-query';
@@ -304,17 +303,17 @@ const SearchPage = () => {
         );
       }
 
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {processedProviders.map((provider) => (
-            <ServiceCard
-              key={provider.id}
-              provider={provider}
-              onViewDetails={() => handleViewProvider(provider.providerId || provider.id)}
-            />
-          ))}
-        </div>
-      );
+             return (
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+           {processedProviders.map((provider) => (
+             <ProviderCard
+               key={provider.id}
+               provider={provider}
+               onViewDetails={() => handleViewProvider(provider.providerId || provider.id)}
+             />
+           ))}
+         </div>
+       );
     } else {
       if (requestsLoading) {
         return (
@@ -344,19 +343,19 @@ const SearchPage = () => {
         );
       }
 
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {processedRequests.map((request) => (
-            <ServiceRequestCard
-              key={request.id}
-              request={request}
-              onInterested={handleApplyToRequest}
-              onViewDetails={handleViewRequest}
-              alreadyApplied={false}
-            />
-          ))}
-        </div>
-      );
+             return (
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+           {processedRequests.map((request) => (
+             <RequestCard
+               key={request.id}
+               request={request}
+               onApply={handleApplyToRequest}
+               onViewDetails={handleViewRequest}
+               alreadyApplied={false}
+             />
+           ))}
+         </div>
+       );
     }
   };
 
