@@ -101,8 +101,8 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
   // Add check availability action if available
   if (onCheckAvailability) {
     actions.push({
-      label: 'تحقق من التوفر',
-      variant: 'outline' as const,
+      label: 'حجز موعد',
+      variant: 'primary' as const,
       onClick: () => onCheckAvailability(provider.id),
       icon: <Calendar className="w-4 h-4" />
     });
