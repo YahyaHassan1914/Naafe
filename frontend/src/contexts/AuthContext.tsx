@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User } from '../types';
+import { authService } from '../services';
+import { User, LoginCredentials, RegisterData } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -8,19 +9,12 @@ interface AuthContextType {
   refreshToken: string | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<User | null>;
-  register: (data: RegisterPayload) => Promise<boolean>;
+  login: (credentials: LoginCredentials) => Promise<User | null>;
+  register: (data: RegisterData) => Promise<boolean>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
-  updateUser: (user: User) => void; // <-- Add this
-}
-
-interface RegisterPayload {
-  email: string;
-  password: string;
-  name: { first: string; last: string };
-  phone: string;
-  roles: ('seeker' | 'provider')[];
+  updateUser: (user: User) => void;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,9 +22,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 interface AuthProviderProps {
   children: ReactNode;
 }
-
-const API_BASE = '/api/auth';
-const USER_API = '/api/users/me';
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const navigate = useNavigate();
@@ -41,134 +32,116 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [refreshToken, setRefreshToken] = useState<string | null>(
     () => localStorage.getItem('refreshToken')
   );
-  const [loading, setLoading] = useState(true); // Start as true
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch user profile if token exists
+  // Setup automatic token refresh
   useEffect(() => {
     if (accessToken) {
-      setLoading(true);
-      fetch(USER_API, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
-        .then(async (res) => {
-          if (!res.ok) throw new Error('فشل تحميل بيانات المستخدم');
-          const data = await res.json();
-          setUser({ ...data.data.user, id: data.data.user._id });
-          setLoading(false);
-        })
-        .catch(() => {
-          setUser(null);
-          setAccessToken(null);
-          setRefreshToken(null);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
+      authService.setupTokenRefresh();
     }
   }, [accessToken]);
 
-  const login = async (email: string, password: string) => {
+  // Fetch user profile if token exists
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (accessToken) {
+        setLoading(true);
+        try {
+          const userData = await authService.getCurrentUser();
+          setUser(userData);
+        } catch (error) {
+          console.error('Failed to fetch user profile:', error);
+          // Token might be invalid, clear everything
+          await logout();
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [accessToken]);
+
+  const login = async (credentials: LoginCredentials) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError(data.error?.message || 'فشل تسجيل الدخول');
-        setLoading(false);
-        return null;
+      const userData = await authService.login(credentials);
+      setUser(userData);
+      
+      // Get tokens from authService
+      const tokens = authService.getTokens();
+      if (tokens) {
+        setAccessToken(tokens.accessToken);
+        setRefreshToken(tokens.refreshToken);
       }
-      setAccessToken(data.data.accessToken);
-      setRefreshToken(data.data.refreshToken);
-      localStorage.setItem('accessToken', data.data.accessToken);
-      localStorage.setItem('refreshToken', data.data.refreshToken);
-      setUser({ ...data.data.user, id: data.data.user._id });
+      
       setLoading(false);
-      return data.data.user; // Return user object
-    } catch {
-      setError('حدث خطأ أثناء تسجيل الدخول');
+      return userData;
+    } catch (error: any) {
+      const errorMessage = error?.message || 'فشل تسجيل الدخول';
+      setError(errorMessage);
       setLoading(false);
       return null;
     }
   };
 
-  const register = async (payload: RegisterPayload) => {
+  const register = async (data: RegisterData) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError(data.error?.message || 'فشل إنشاء الحساب');
+      const success = await authService.register(data);
+      if (success) {
+        // Auto-login after successful registration
+        const loginData: LoginCredentials = {
+          email: data.email,
+          password: data.password
+        };
+        const userData = await login(loginData);
         setLoading(false);
-        return false;
+        return !!userData;
       }
-      // Auto-login after registration
-      const loginSuccess = await login(payload.email, payload.password);
       setLoading(false);
-      return loginSuccess;
-    } catch {
-      setError('حدث خطأ أثناء إنشاء الحساب');
+      return false;
+    } catch (error: any) {
+      const errorMessage = error?.message || 'فشل إنشاء الحساب';
+      setError(errorMessage);
       setLoading(false);
       return false;
     }
   };
 
   const logout = async () => {
-    // Try to call backend logout endpoint to invalidate token
-    if (accessToken) {
-      try {
-        await fetch(`${API_BASE}/logout`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`
-          },
-        });
-      } catch {
-        // Ignore errors - we still want to logout locally
-        console.log('Backend logout failed, continuing with local logout');
-      }
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear all authentication state
+      setUser(null);
+      setAccessToken(null);
+      setRefreshToken(null);
+      setError(null);
+      
+      // Clear all stored data
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Clear any cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Navigate to landing page
+      navigate('/', { replace: true });
     }
+  };
 
-    // Clear all authentication state immediately
-    setUser(null);
-    setAccessToken(null);
-    setRefreshToken(null);
-    
-    // Clear all stored data
-    localStorage.clear();
-    sessionStorage.clear();
-    
-    // Clear any cookies that might be set
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-    });
-    
-    // Clear browser history completely to prevent back navigation
-    // This is the key to preventing users from going back to authenticated pages
-    window.history.pushState(null, '', '/');
-    window.history.replaceState(null, '', '/');
-    
-    // Navigate to landing page with replace to prevent back button
-    navigate('/', { replace: true });
-    
-    // Force a complete page reload to ensure all components re-render
-    // This is the most reliable way to prevent any cached state or components
-    setTimeout(() => {
-      window.location.replace('/');
-    }, 50);
+  const clearError = () => {
+    setError(null);
   };
 
   const isAuthenticated = !!user && !!accessToken;
@@ -185,7 +158,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         register,
         logout,
         isAuthenticated,
-        updateUser: (user: User) => setUser(user), // <-- Add this
+        updateUser: setUser,
+        clearError,
       }}
     >
       {children}
