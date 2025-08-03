@@ -229,7 +229,10 @@ const Header = ({ onSearch, searchValue = '' }: HeaderProps) => {
   // Navigation items: only show 'للإشتراك' for providers
   const navigationItems = [
     { label: 'الخدمات', href: '/categories' },
-    ...(isProvider ? [{ label: 'للإشتراك', href: '/pricing' }] : []),
+    ...(isProvider ? [
+      { label: 'لوحة التحكم', href: '/provider-dashboard' },
+      { label: 'للإشتراك', href: '/pricing' }
+    ] : []),
     { label: 'أعلن معنا', href: '/advertise' },
     { label: 'استكشف', href: '/search' },
   ];

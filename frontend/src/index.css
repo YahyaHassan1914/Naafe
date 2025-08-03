@@ -230,6 +230,21 @@ html[dir="rtl"] .btn-with-icon svg {
   transform: scaleX(-1);
 }
 
+/* Fix for Button component in RTL mode */
+html[dir="rtl"] button[class*="inline-flex"] {
+  flex-direction: row !important;
+}
+
+/* Ensure icons in buttons display inline */
+.naafe-button {
+  flex-direction: row !important;
+}
+
+.naafe-button svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
 /* Custom Animations for Chat Interface */
 @keyframes fade-in {
   from {

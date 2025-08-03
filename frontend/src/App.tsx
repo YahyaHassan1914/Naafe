@@ -40,6 +40,8 @@ import ProviderHireRequestsPage from './pages/ProviderHireRequestsPage';
 import TransactionsPage from './pages/TransactionsPage';
 import NewChatPage from './pages/NewChatPage';
 import SchedulePage from './pages/SchedulePage';
+import RequestSuccessPage from './pages/RequestSuccessPage';
+import ProviderDashboardPage from './pages/ProviderDashboardPage';
 import { ResetPasswordHandler } from './components/ui/ResetPasswordHandler';
 
 const App = () => {
@@ -75,6 +77,11 @@ const App = () => {
                   <SchedulePage />
                 </ProtectedRoute>
               } />
+              <Route path="/provider-dashboard" element={
+                <ProtectedRoute requiredRoles={['provider']}>
+                  <ProviderDashboardPage />
+                </ProtectedRoute>
+              } />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/reset-password" element={<ResetPasswordHandler />} />
@@ -102,6 +109,11 @@ const App = () => {
                 <Route path="/request-service" element={
                   <ProtectedRoute requiredRoles={['seeker']}>
                     <RequestServiceForm />
+                  </ProtectedRoute>
+                } />
+                <Route path="/request-success" element={
+                  <ProtectedRoute requiredRoles={['seeker']}>
+                    <RequestSuccessPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/requests/:id" element={<RequestServiceDetailsPage />} />

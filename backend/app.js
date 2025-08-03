@@ -21,6 +21,7 @@ import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import adRoutes from './routes/adRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import providerRoutes from './routes/providerRoutes.js';
 import { requestLogger, errorLogger, performanceLogger, securityLogger } from './middlewares/logging.middleware.js';
 
 const app = express();
@@ -79,6 +80,7 @@ app.use('/api/ads', adRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/schedule', scheduleRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/providers', providerRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
