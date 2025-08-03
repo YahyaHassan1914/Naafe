@@ -250,7 +250,7 @@ const ServiceResponseForm: React.FC = () => {
         <main className="flex-1 flex items-center justify-center">
           <div className="text-deep-teal text-lg text-center">
             يجب أن تكون مقدم خدمات لتقديم عرض على هذا الطلب.<br />
-            <Button variant="primary" className="mt-4" onClick={() => navigate('/upgrade')}>ترقية حسابك</Button>
+            <Button variant="primary" className="mt-4" onClick={() => navigate('/register')}>إنشاء حساب مقدم خدمات</Button>
           </div>
         </main>
         <Footer />

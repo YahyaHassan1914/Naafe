@@ -9,7 +9,7 @@ import Message from './Message.js';
 import Notification from './Notification.js';
 import Payment from './Payment.js';
 import Complaint from './Complaint.js';
-import Ad from './Ad.js';
+// Removed Ad import - feature no longer exists
 
 // Ensure discriminators are registered
 // This is important because the discriminator models need to be imported
@@ -26,8 +26,7 @@ export {
   Message,
   Notification,
   Payment,
-  Complaint,
-  Ad
+  Complaint
 };
 
 export default User; 

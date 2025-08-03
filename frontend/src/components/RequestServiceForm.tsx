@@ -282,7 +282,7 @@ const RequestServiceForm: React.FC = () => {
           const data = await response.json();
           setFormData(prev => ({
             ...prev,
-            images: [...prev.images, data.imageUrl]
+            images: [...prev.images, data.data.imageUrl]
           }));
           setImageUploadProgress(prev => ({ ...prev, [file.name]: true }));
         } else {
@@ -348,7 +348,7 @@ const RequestServiceForm: React.FC = () => {
           address: '',
           additionalInformation: '',
         },
-        deadline: undefined,
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
         deliveryTimeDays: 1,
         tags: [],
         attachments: formData.images.map(url => ({

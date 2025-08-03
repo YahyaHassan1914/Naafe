@@ -575,24 +575,7 @@ export const getUnifiedTransactions = async (req, res) => {
       relatedId: p.jobRequestId || p.offerId || null
     })) : [];
 
-    // 2. Fetch ad purchases
-    const Ad = (await import('../models/Ad.js')).default;
-    const adPayments = await Ad.find({ advertiserId: userId }).sort({ createdAt: -1 });
-    const adTransactions = adPayments.map(ad => ({
-      id: ad._id,
-      type: 'ad',
-      amount: ad.budget.total,
-      currency: ad.budget.currency || 'EGP',
-      date: ad.createdAt,
-      status: ad.status,
-      description: `إعلان: ${ad.title}`,
-      relatedId: ad._id,
-      adData: {
-        title: ad.title,
-        placement: ad.placement,
-        duration: ad.duration
-      }
-    }));
+    // Removed ad purchases - feature no longer exists
 
     // 2. Fetch Stripe charges and refunds for subscriptions
     let stripeTransactions = [];

@@ -11,7 +11,7 @@ const Hero: React.FC = () => {
     if (!user) {
       navigate('/register');
     } else {
-      window.dispatchEvent(new CustomEvent('openUpgradeModal'));
+      navigate('/provider-dashboard');
     }
   };
 

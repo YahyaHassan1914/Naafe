@@ -27,7 +27,7 @@ const fetchRelevantData = async (userRole: string, searchQuery: string, category
     // Seekers only see providers
     params.set('sort', 'rating');
     
-    const res = await fetch(`/api/listings/listings?${params.toString()}`);
+    const res = await fetch(`/api/listings?${params.toString()}`);
     const json = await res.json();
     if (!json.success) throw new Error(json.error?.message || 'فشل تحميل الخدمات');
     return { type: 'providers', data: json.data.listings || [] };

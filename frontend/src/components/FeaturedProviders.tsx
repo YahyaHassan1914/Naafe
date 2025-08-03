@@ -73,7 +73,7 @@ const FeaturedProviders: React.FC = () => {
                 isTopRated: provider.isTopRated,
                 completedJobs: profile.totalJobsCompleted ?? 0,
                 isVerified: provider.isVerified,
-                providerUpgradeStatus: provider.providerUpgradeStatus,
+
                 availability: profile.availability || { days: [], timeSlots: [] },
                 budgetMin: profile.budgetMin ?? 0,
                 budgetMax: profile.budgetMax ?? 0,

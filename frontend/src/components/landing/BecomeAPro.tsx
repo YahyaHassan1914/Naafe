@@ -11,9 +11,8 @@ const BecomeAPro: React.FC = () => {
     if (!user) {
       navigate('/register');
     } else {
-      // Open upgrade modal - this will be handled by the Header component
-      // We'll use a custom event to trigger the modal
-      window.dispatchEvent(new CustomEvent('openUpgradeModal'));
+      // Navigate to provider dashboard or profile
+      navigate('/provider-dashboard');
     }
   };
 

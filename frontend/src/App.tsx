@@ -22,7 +22,7 @@ import LandingPage from './pages/LandingPage';
 import RequestServiceForm from './components/RequestServiceForm';
 import RequestServiceDetailsPage from './pages/RequestServiceDetailsPage';
 import ServiceResponseForm from './components/ServiceResponseForm';
-import AdminUpgradeRequests from './admin/pages/AdminUpgradeRequests';
+
 import AdminManageComplaints from './admin/pages/AdminManageComplaints';
 import HelpCenterPage from './pages/HelpCenterPage';
 import SettingsPage from './pages/SettingsPage';
@@ -178,7 +178,7 @@ const App = () => {
                 <Route path="users" element={<AdminManageUsers />} />
                 <Route path="identity-verifications" element={<AdminIdentityVerifications />} />
                 <Route path="categories" element={<AdminManageCategories />} />
-                <Route path="upgrade-requests" element={<AdminUpgradeRequests />} />
+
                 <Route path="complaints" element={<AdminManageComplaints />} />
               </Route>
               {/* Fallback routes for footer links */}

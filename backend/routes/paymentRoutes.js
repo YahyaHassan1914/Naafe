@@ -10,37 +10,14 @@ import {
   getUnifiedTransactions
 } from '../controllers/paymentController.js';
 import { authenticateToken, requireRole } from '../middlewares/auth.middleware.js';
-import adService from '../services/adService.js';
+// Removed adService import - feature no longer exists
 
 const router = express.Router();
 
 // Create escrow payment session
 router.post('/create-escrow-payment', authenticateToken, requireRole(['seeker']), createEscrowPayment);
 
-// Create checkout session for promotions (ads) - won't trigger ad blockers
-router.post('/promotion-checkout/:adId', authenticateToken, async (req, res) => {
-  try {
-    const { adId } = req.params;
-    const userId = req.user._id;
-
-    const session = await adService.createCheckoutSession(adId, userId);
-
-    res.status(200).json({
-      success: true,
-      data: session,
-      message: 'تم إنشاء جلسة الدفع بنجاح'
-    });
-  } catch (error) {
-    console.error('Error creating promotion checkout session:', error);
-    res.status(500).json({
-      success: false,
-      error: {
-        code: 'CHECKOUT_ERROR',
-        message: error.message || 'حدث خطأ أثناء إنشاء جلسة الدفع'
-      }
-    });
-  }
-});
+// Removed promotion checkout route - feature no longer exists
 
 // Webhook endpoint (no auth required, Stripe handles verification)
 router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);

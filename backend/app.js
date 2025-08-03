@@ -11,18 +11,15 @@ import verificationRoutes from './routes/verificationRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
-import upgradeRequestRoutes from './routes/upgradeRequestRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
-import aiRoutes from './routes/aiRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import complaintRoutes from './routes/complaintRoutes.js';
-import subscriptionRoutes from './routes/subscriptionRoutes.js';
-import adRoutes from './routes/adRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import providerRoutes from './routes/providerRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 import { requestLogger, errorLogger, performanceLogger, securityLogger } from './middlewares/logging.middleware.js';
 
 const app = express();
@@ -36,8 +33,7 @@ app.use(cors({
 // Parse JSON for all routes except webhook
 app.use((req, res, next) => {
   if (
-    req.path === '/api/payment/webhook' ||
-    req.path === '/api/subscriptions/webhook'
+    req.path === '/api/payment/webhook'
   ) {
     // For Stripe webhooks, we need raw body
     express.raw({ type: 'application/json' })(req, res, next);
@@ -48,6 +44,8 @@ app.use((req, res, next) => {
 });
 
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+
+// Note: Removed static file serving since we're using ImgBB for image uploads
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -69,20 +67,17 @@ app.use('/api/offers', offerRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/upgrade-requests', upgradeRequestRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/complaints', complaintRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/ads', adRoutes);
 app.use('/api/listings', listingRoutes);
 app.use('/api/schedule', scheduleRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/booking', bookingRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

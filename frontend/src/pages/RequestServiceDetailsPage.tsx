@@ -1,445 +1,288 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
-import ServiceDetailsContainer from '../components/ServiceDetails';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
-import BackButton from '../components/ui/BackButton';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useOfferContext } from '../contexts/OfferContext';
-import { useToast } from '../contexts/ToastContext';
-import ReportServiceModal from '../components/ui/ReportServiceModal';
+import { User, Calendar, DollarSign, MapPin, Clock, ArrowLeft, MessageCircle, Plus } from 'lucide-react';
+import Button from '../components/ui/Button';
+import BaseCard from '../components/ui/BaseCard';
+import PageLayout from '../components/layout/PageLayout';
 
-interface BackendOffer {
-  _id: string;
-  provider?: {
-    _id: string;
-    name?: {
-      first?: string;
-      last?: string;
-    } | string;
-    avatarUrl?: string;
-    isVerified?: boolean;
-    isTopRated?: boolean;
-    isPremium?: boolean;
-    createdAt?: string;
-    providerProfile?: {
-      rating?: number;
-      skills?: string[];
-      totalJobsCompleted?: number;
-    };
-  };
-  budget?: {
+interface ServiceRequest {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  budget: {
     min: number;
     max: number;
     currency: string;
   };
-  message?: string;
-  estimatedTimeDays?: number;
-  availableDates?: string[];
-  timePreferences?: string[];
-  createdAt?: string;
-  status?: string;
+  urgency: string;
+  deadline?: string;
+  timePosted: string;
+  responses: number;
+  status: string;
+  postedBy: {
+    id: string;
+    name: string;
+    avatar?: string;
+  };
+  location?: {
+    address?: string;
+    government?: string;
+    city?: string;
+  };
 }
 
-const RequestServiceDetailsPage = () => {
-  const { id } = useParams();
-  const location = useLocation();
-  const { accessToken, user } = useAuth();
-  const { offers, addNewOffer, setOffers } = useOfferContext();
-  const { showSuccess, showError } = useToast();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [service, setService] = useState<any>(null); // TODO: Replace 'any' with proper type after mapping
+const RequestServiceDetailsPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [request, setRequest] = useState<ServiceRequest | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isSaved, setIsSaved] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [isReporting, setIsReporting] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
 
-  // Fetch offers for this service
-  const fetchOffers = useCallback(async () => {
+  useEffect(() => {
     if (!id) return;
-    
-    try {
-      const res = await fetch(`/api/requests/${id}/offers`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          // Map the backend offers to frontend format
-          const mappedOffers = (data.data.offers || []).map((offer: BackendOffer) => ({
-            id: offer._id,
-            name: offer.provider?.name ? 
-              (typeof offer.provider.name === 'object' 
-                ? `${offer.provider.name.first || ''} ${offer.provider.name.last || ''}`.trim()
-                : offer.provider.name)
-              : 'مستخدم غير معروف',
-            avatar: offer.provider?.avatarUrl || '',
-            rating: offer.provider?.providerProfile?.rating || 0,
-            price: offer.budget?.min || 0,
-            specialties: offer.provider?.providerProfile?.skills || [],
-            verified: offer.provider?.isVerified || false,
-            message: offer.message || '',
-            estimatedTimeDays: offer.estimatedTimeDays || 1,
-            availableDates: offer.availableDates || [],
-            timePreferences: offer.timePreferences || [],
-            createdAt: offer.createdAt,
-            status: offer.status || 'pending',
-            providerId: offer.provider?._id || offer.provider,
-            jobRequestId: id,
-            stats: {
-              rating: offer.provider?.providerProfile?.rating || 0,
-              completedJobs: offer.provider?.providerProfile?.totalJobsCompleted || 0,
-              completionRate: 100, // Default value
-              joinDate: offer.provider?.createdAt || '',
-              isTopRated: offer.provider?.isTopRated || false,
-              isPremium: offer.provider?.isPremium || false,
-            }
-          }));
-          setOffers(mappedOffers);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching offers:', error);
-    }
-  }, [id, accessToken, setOffers]);
+    fetchRequestDetails();
+  }, [id]);
 
-  // Check if service is saved
-  const checkIfSaved = useCallback(async () => {
-    if (!id || !user || !accessToken) {
-      console.log('🔍 checkIfSaved: Missing required data', { id, user: !!user, accessToken: !!accessToken });
-      return;
-    }
-    
-    console.log('🔍 checkIfSaved: Checking saved status for service', { id, userId: user.id });
-    
+  const fetchRequestDetails = async () => {
     try {
-      const res = await fetch(`/api/users/me/saved-services/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-      
-      console.log('🔍 checkIfSaved: Response status', res.status);
-      
-      if (res.ok) {
-        const data = await res.json();
-        console.log('🔍 checkIfSaved: Response data', data);
-        const newIsSaved = data.isSaved || false;
-        console.log('🔍 checkIfSaved: Setting isSaved to', newIsSaved);
-        setIsSaved(newIsSaved);
-      } else if (res.status === 404) {
-        // Service not saved
-        console.log('🔍 checkIfSaved: Service not saved (404)');
-        setIsSaved(false);
-      } else {
-        console.error('Error checking saved status:', res.status);
-        setIsSaved(false);
-      }
-    } catch (error) {
-      console.error('Error checking saved status:', error);
-      setIsSaved(false);
-    }
-  }, [id, user, accessToken]);
-
-  useEffect(() => {
-    const fetchData = async () => {
       setLoading(true);
-      try {
-        const res = await fetch(`/api/requests/${id}`);
-        const data = await res.json();
-        
-        if (!data.success) throw new Error(data.error?.message || 'Failed to fetch');
-        
-        // TODO: Map backend jobRequest to frontend service model as needed
-        const mappedService = {
-          ...data.data.jobRequest,
-          postedBy: { 
-            id: data.data.jobRequest.seeker?._id || data.data.jobRequest.seeker?.id || data.data.jobRequest.seeker, 
-            name: data.data.jobRequest.seeker?.name ? 
-              (typeof data.data.jobRequest.seeker.name === 'object' 
-                ? `${data.data.jobRequest.seeker.name.first || ''} ${data.data.jobRequest.seeker.name.last || ''}`.trim()
-                : data.data.jobRequest.seeker.name)
-              : 'مستخدم غير معروف'
+      const response = await fetch(`/api/requests/${id}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const requestData = data.data;
+        setRequest({
+          id: requestData._id,
+          title: requestData.title,
+          description: requestData.description,
+          category: requestData.category,
+          budget: requestData.budget || { min: 0, max: 0, currency: 'EGP' },
+          urgency: requestData.urgency || 'medium',
+          deadline: requestData.deadline,
+          timePosted: requestData.createdAt || new Date().toISOString(),
+          responses: requestData.offersCount || 0,
+          status: requestData.status || 'open',
+          postedBy: {
+            id: requestData.seeker?._id || '',
+            name: requestData.seeker?.name ? 
+              `${requestData.seeker.name.first || ''} ${requestData.seeker.name.last || ''}`.trim() : 
+              'مستخدم',
+            avatar: requestData.seeker?.avatarUrl
           },
-          // Map location/address fields, images, requester, etc. as needed
-          images: (data.data.jobRequest.attachments || []).map((a: { url: string }) => a.url),
-          requester: data.data.jobRequest.seeker ? {
-            id: data.data.jobRequest.seeker._id || data.data.jobRequest.seeker.id,
-            name: typeof data.data.jobRequest.seeker.name === 'object'
-              ? `${data.data.jobRequest.seeker.name.first || ''} ${data.data.jobRequest.seeker.name.last || ''}`.trim()
-              : data.data.jobRequest.seeker.name || 'مستخدم غير معروف',
-            avatar: data.data.jobRequest.seeker.avatarUrl || '',
-            createdAt: data.data.jobRequest.seeker.createdAt,
-          } : null,
-          // Add comments: [] if not present
-          comments: [],
-          timeline: data.data.jobRequest.deadline ? new Date(data.data.jobRequest.deadline).toLocaleString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : undefined,
-        };
-        
-        setService(mappedService);
-        
-        // Fetch offers
-        await fetchOffers();
-        
-      } catch (err) {
-        console.error('Error fetching service:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch service');
-      } finally {
-        setLoading(false);
+          location: requestData.location
+        });
       }
-    };
-
-    if (id) {
-      fetchData();
+    } catch (error) {
+      console.error('Error fetching request details:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [id, accessToken, fetchOffers]);
+  };
 
-  // Check saved status after service is loaded and user is authenticated
-  useEffect(() => {
-    console.log('🔄 useEffect checkIfSaved: Dependencies changed', { 
-      service: !!service, 
-      user: !!user, 
-      accessToken: !!accessToken, 
-      id 
-    });
+  const handleApplyForWork = () => {
+    navigate(`/requests/${id}/respond`);
+  };
+
+  const handleContactSeeker = () => {
+    navigate(`/chat/new?seeker=${request?.postedBy.id}`);
+  };
+
+  const formatBudget = () => {
+    if (!request) return '';
+    const { budget } = request;
+    if (budget.min && budget.max && budget.min !== budget.max) {
+      return `${budget.min.toLocaleString()} - ${budget.max.toLocaleString()} جنيه`;
+    } else if (budget.min) {
+      return `${budget.min.toLocaleString()} جنيه`;
+    }
+    return 'سعر متغير';
+  };
+
+  const formatTimePosted = () => {
+    if (!request?.timePosted) return '';
+    const date = new Date(request.timePosted);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
-    if (service && user && accessToken && id) {
-      console.log('🔄 useEffect checkIfSaved: Calling checkIfSaved');
-      // Add a small delay to ensure authentication is properly established
-      const timer = setTimeout(() => {
-        console.log('🔄 useEffect checkIfSaved: Executing checkIfSaved after delay');
-        checkIfSaved();
-      }, 500); // Increased delay to ensure everything is loaded
-      
-      return () => clearTimeout(timer);
-    } else {
-      console.log('🔄 useEffect checkIfSaved: Not calling checkIfSaved - missing dependencies');
-    }
-  }, [service, user, accessToken, id, checkIfSaved]);
+    if (diffInHours < 1) return 'منذ أقل من ساعة';
+    if (diffInHours < 24) return `منذ ${diffInHours} ساعة`;
+    if (diffInHours < 48) return 'منذ يوم';
+    if (diffInHours < 168) return `منذ ${Math.floor(diffInHours / 24)} أيام`;
+    return date.toLocaleDateString('ar-EG', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
 
-  // Log when isSaved state changes
-  useEffect(() => {
-    console.log('🔄 isSaved state changed:', isSaved);
-  }, [isSaved]);
+  const formatDeadline = () => {
+    if (!request?.deadline) return 'غير محدد';
+    const date = new Date(request.deadline);
+    return date.toLocaleDateString('ar-EG', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
 
-  // Handle Save/Unsave service
-  const handleSave = async () => {
-    if (!id || !user) {
-      showError('يجب تسجيل الدخول أولاً');
-      return;
-    }
-
-    console.log('🔍 handleSave: Starting save/unsave process', { id, isSaved, userId: user.id });
-
-    try {
-      const method = isSaved ? 'DELETE' : 'POST';
-      console.log('🔍 handleSave: Making request', { method, url: `/api/users/me/saved-services/${id}` });
-      
-      const res = await fetch(`/api/users/me/saved-services/${id}`, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-
-      console.log('🔍 handleSave: Response status', res.status);
-
-      if (res.ok) {
-        console.log('🔍 handleSave: Success, updating state from', isSaved, 'to', !isSaved);
-        setIsSaved(!isSaved);
-        showSuccess(isSaved ? 'تم إزالة الخدمة من المحفوظات' : 'تم حفظ الخدمة بنجاح');
-      } else {
-        const errorData = await res.json();
-        console.error('🔍 handleSave: Error response', errorData);
-        throw new Error(errorData.error?.message || 'Failed to save/unsave service');
-      }
-    } catch (error) {
-      console.error('Error saving service:', error);
-      showError('حدث خطأ أثناء حفظ الخدمة');
+  const getUrgencyColor = () => {
+    switch (request?.urgency) {
+      case 'high': return 'text-red-600 bg-red-100';
+      case 'medium': return 'text-orange-600 bg-orange-100';
+      default: return 'text-green-600 bg-green-100';
     }
   };
 
-  // Handle Share service
-  const handleShare = async () => {
-    if (!service) return;
-
-    setIsSharing(true);
-    try {
-      const shareData = {
-        title: service.title,
-        text: service.description,
-        url: window.location.href,
-      };
-
-      if (navigator.share) {
-        // Use native sharing if available
-        await navigator.share(shareData);
-        showSuccess('تم مشاركة الخدمة بنجاح');
-      } else {
-        // Fallback to copying URL
-        await navigator.clipboard.writeText(window.location.href);
-        showSuccess('تم نسخ رابط الخدمة إلى الحافظة');
-      }
-    } catch (error) {
-      console.error('Error sharing service:', error);
-      showError('حدث خطأ أثناء مشاركة الخدمة');
-    } finally {
-      setIsSharing(false);
+  const getUrgencyText = () => {
+    switch (request?.urgency) {
+      case 'high': return 'عاجل';
+      case 'medium': return 'متوسط';
+      default: return 'عادي';
     }
   };
 
-  // Handle Report service
-  const handleReport = () => {
-    if (!id || !user) {
-      showError('يجب تسجيل الدخول أولاً');
-      return;
-    }
-    setShowReportModal(true);
-  };
-
-  // Handle Report submission
-  const handleReportSubmit = async (problemType: string, description: string) => {
-    if (!id || !user) {
-      showError('يجب تسجيل الدخول أولاً');
-      return;
-    }
-
-    setIsReporting(true);
-    try {
-      const res = await fetch(`/api/reports`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          type: 'service_request',
-          targetId: id,
-          reason: problemType,
-          description: description,
-        }),
-      });
-
-      if (res.ok) {
-        showSuccess('تم إرسال البلاغ بنجاح');
-        setShowReportModal(false);
-      } else {
-        throw new Error('Failed to submit report');
-      }
-    } catch (error) {
-      console.error('Error reporting service:', error);
-      showError('حدث خطأ أثناء إرسال البلاغ');
-    } finally {
-      setIsReporting(false);
-    }
+  const formatLocation = () => {
+    if (!request?.location) return 'غير محدد';
+    const { government, city, address } = request.location;
+    const parts = [government, city, address].filter(Boolean);
+    return parts.length > 0 ? parts.join('، ') : 'غير محدد';
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-warm-cream">
-        <Header />
-        <main className="flex-1">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-deep-teal mx-auto mb-4"></div>
-              <p className="text-deep-teal">جاري تحميل تفاصيل الخدمة...</p>
-            </div>
+      <PageLayout title="تحميل..." user={user}>
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded mb-4"></div>
+            <div className="h-64 bg-gray-200 rounded mb-4"></div>
+            <div className="h-32 bg-gray-200 rounded"></div>
           </div>
-        </main>
-        <Footer />
-      </div>
+        </div>
+      </PageLayout>
     );
   }
 
-  if (error || !service) {
+  if (!request) {
     return (
-      <div className="min-h-screen flex flex-col bg-warm-cream">
-        <Header />
-        <main className="flex-1">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-              <h2 className="text-xl font-bold text-red-800 mb-2">خطأ في تحميل البيانات</h2>
-              <p className="text-red-600 mb-4">{error || 'فشل في تحميل تفاصيل الخدمة'}</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-              >
-                إعادة تحميل الصفحة
-              </button>
-            </div>
-          </div>
-        </main>
-        <Footer />
-      </div>
+      <PageLayout title="خطأ" user={user}>
+        <div className="max-w-4xl mx-auto px-4 py-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">الطلب غير موجود</h1>
+          <Button onClick={() => navigate('/search')}>العودة للبحث</Button>
+        </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-warm-cream">
-      <Header />
-      <main className="flex-1">
-        {/* Back Button Section */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <BackButton to={location.state?.from || '/search'} className="mb-4" />
+    <PageLayout title={`${request.title} - نافع`} user={user}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Back Button */}
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            leftIcon={<ArrowLeft className="w-4 h-4" />}
+            onClick={() => navigate(-1)}
+          >
+            رجوع
+          </Button>
         </div>
-        
-        {/* Service Details */}
-        {(() => {
-          try {
-            return (
-              <ServiceDetailsContainer
-                service={service}
-                offers={offers}
-                onInterested={() => {}}
-                onShare={handleShare}
-                onBookmark={handleSave}
-                onReport={handleReport}
-                onOfferAdded={addNewOffer}
-                onOffersRefresh={fetchOffers}
-                isSaved={isSaved}
-                isSharing={isSharing}
-                isReporting={isReporting}
-              />
-            );
-          } catch (error) {
-            console.error('Error rendering ServiceDetailsContainer:', error);
-            return (
-              <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                  <h2 className="text-xl font-bold text-red-800 mb-2">خطأ في عرض البيانات</h2>
-                  <p className="text-red-600 mb-4">حدث خطأ أثناء عرض تفاصيل الخدمة</p>
-                  <button 
-                    onClick={() => window.location.reload()} 
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-                  >
-                    إعادة تحميل الصفحة
-                  </button>
+
+        {/* Request Header */}
+        <BaseCard className="mb-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">{request.title}</h1>
+              <p className="text-gray-600 mb-3">{request.category}</p>
+              
+              {/* Urgency and Time Posted */}
+              <div className="flex items-center gap-4 text-sm mb-3">
+                <span className={`px-3 py-1 rounded-full font-medium ${getUrgencyColor()}`}>
+                  {getUrgencyText()}
+                </span>
+                <div className="flex items-center gap-1 text-gray-500">
+                  <Clock className="w-4 h-4" />
+                  <span>{formatTimePosted()}</span>
+                </div>
+                <div className="flex items-center gap-1 text-gray-500">
+                  <User className="w-4 h-4" />
+                  <span>{request.responses} رد</span>
                 </div>
               </div>
-            );
-          }
-        })()}
-      </main>
-      <Footer />
-      
-             {/* Report Modal */}
-       {service && (
-         <ReportServiceModal
-           isOpen={showReportModal}
-           onClose={() => setShowReportModal(false)}
-           onSubmit={handleReportSubmit}
-           serviceTitle={service.title || 'خدمة غير محددة'}
-           loading={isReporting}
-         />
-       )}
-      
 
-    </div>
+              {/* Budget */}
+              <div className="flex items-center gap-2 text-sm">
+                <DollarSign className="w-4 h-4 text-green-600" />
+                <span className="font-semibold text-green-600">{formatBudget()}</span>
+              </div>
+            </div>
+
+            {/* Client Info */}
+            <div className="text-right">
+              <div className="flex items-center gap-2 mb-2">
+                <img
+                  src={request.postedBy.avatar || '/default-avatar.png'}
+                  alt={request.postedBy.name}
+                  className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                />
+                <div>
+                  <p className="font-medium text-gray-800">{request.postedBy.name}</p>
+                  <p className="text-sm text-gray-500">صاحب الطلب</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </BaseCard>
+
+        {/* Description */}
+        <BaseCard className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">تفاصيل الطلب</h2>
+          <p className="text-gray-600 leading-relaxed">{request.description}</p>
+        </BaseCard>
+
+        {/* Additional Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Location */}
+          <BaseCard>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">الموقع</h3>
+            <div className="flex items-center gap-2 text-gray-600">
+              <MapPin className="w-4 h-4" />
+              <span>{formatLocation()}</span>
+            </div>
+          </BaseCard>
+
+          {/* Deadline */}
+          <BaseCard>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">الموعد النهائي</h3>
+            <div className="flex items-center gap-2 text-gray-600">
+              <Calendar className="w-4 h-4" />
+              <span>{formatDeadline()}</span>
+            </div>
+          </BaseCard>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-4">
+          <Button
+            variant="primary"
+            leftIcon={<Plus className="w-4 h-4" />}
+            onClick={handleApplyForWork}
+            className="flex-1"
+          >
+            تقدم للعمل
+          </Button>
+          <Button
+            variant="outline"
+            leftIcon={<MessageCircle className="w-4 h-4" />}
+            onClick={handleContactSeeker}
+            className="flex-1"
+          >
+            تواصل مع صاحب الطلب
+          </Button>
+        </div>
+      </div>
+    </PageLayout>
   );
 };
 

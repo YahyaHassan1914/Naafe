@@ -112,7 +112,7 @@ interface Profile {
     };
   };
   isVerified: boolean;
-  providerUpgradeStatus?: 'pending' | 'rejected' | 'accepted' | 'none';
+
   verification?: {
     status?: string;
     explanation?: string;
@@ -421,11 +421,7 @@ const ProfilePage: React.FC = () => {
     return !!user.isVerified;
   };
 
-  // Helper: get provider upgrade status
-  const getProviderUpgradeStatus = (user: Profile | null) => {
-    if (!user) return 'none';
-    return user.providerUpgradeStatus || 'none';
-  };
+
 
   // Helper for 12-hour Arabic time format
   function formatTimeArabic12hr(time: string) {
@@ -459,12 +455,7 @@ const ProfilePage: React.FC = () => {
           </BaseCard>
         ) : profile && stats ? (
           <BaseCard className="mb-8 p-6 flex flex-col lg:flex-row gap-8 items-center lg:items-start bg-light-cream relative">
-            {/* Upgrade badge - top left */}
-            {profile?.roles.includes('provider') && getProviderUpgradeStatus(profile) === 'accepted' && (
-              <span className="absolute top-4 left-4 z-20 bg-green-100 text-green-800 border border-green-300 px-4 py-1 rounded-lg font-bold text-base shadow">
-                تمت الترقية
-              </span>
-            )}
+
             {/* Avatar + Upload */}
             <div className="relative shrink-0 flex flex-col items-center gap-2">
               <div className="relative">
@@ -603,16 +594,7 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
               )}
-              {profile?.roles.includes('provider') && getProviderUpgradeStatus(profile) === 'pending' && (
-                <Badge variant="status" size="sm" className="inline-flex items-center gap-1">
-                  <span>قيد الترقية</span>
-                </Badge>
-              )}
-              {profile?.roles.includes('provider') && getProviderUpgradeStatus(profile) === 'rejected' && (
-                <Badge variant="urgency" size="sm" className="inline-flex items-center gap-1">
-                  <span>تم رفض الترقية</span>
-                </Badge>
-              )}
+
               {/* Availability Section (for providers) */}
               {profile?.roles.includes('provider') && (
                 <div className="mt-2 w-full">

@@ -1,6 +1,6 @@
 import userService from '../services/userService.js';
 import { logger } from '../middlewares/logging.middleware.js';
-import UpgradeRequest from '../models/UpgradeRequest.js';
+// Removed UpgradeRequest import - feature no longer exists
 import jobRequestService from '../services/jobRequestService.js';
 
 class UserController {
@@ -217,52 +217,7 @@ class UserController {
     }
   }
 
-  /**
-   * Get all upgrade requests for the current user
-   * GET /api/upgrade-requests/me
-   */
-  async getAllMyUpgradeRequests(req, res) {
-    try {
-      const userId = req.user._id;
-      const requests = await UpgradeRequest.find({ userId }).sort({ createdAt: -1 });
-      res.status(200).json({
-        success: true,
-        data: { requests },
-        message: 'تم جلب جميع طلبات الترقية بنجاح',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      logger.error(`Get all my upgrade requests error: ${error.message}`);
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'حدث خطأ أثناء جلب طلبات الترقية' },
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
-
-  /**
-   * Mark all unviewed upgrade requests as viewed for the current user
-   * PATCH /api/upgrade-requests/viewed
-   */
-  async markUpgradeRequestsViewed(req, res) {
-    try {
-      const userId = req.user._id;
-      await UpgradeRequest.updateMany({ userId, viewedByUser: false, status: { $in: ['accepted', 'rejected'] } }, { $set: { viewedByUser: true } });
-      res.status(200).json({
-        success: true,
-        message: 'تم تحديث حالة الاطلاع على الطلبات',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      logger.error(`Mark upgrade requests viewed error: ${error.message}`);
-      res.status(500).json({
-        success: false,
-        error: { code: 'INTERNAL_ERROR', message: 'حدث خطأ أثناء تحديث حالة الاطلاع' },
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
+  // Removed upgrade request methods - feature no longer exists
 
   /**
    * Get provider skills for current user

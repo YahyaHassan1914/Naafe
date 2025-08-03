@@ -25,46 +25,9 @@ router.get('/charts/revenue', authenticateToken, requireRole(['admin']), adminCo
 router.get('/activity', authenticateToken, requireRole(['admin']), adminController.getRecentActivity.bind(adminController));
 
 // Upgrade Requests
-router.get('/upgrade-requests', authenticateToken, requireRole(['admin']), AdminController.getUpgradeRequests);
-router.post('/upgrade-requests/:id/accept', authenticateToken, requireRole(['admin']), AdminController.acceptUpgradeRequest);
-router.post('/upgrade-requests/:id/reject', authenticateToken, requireRole(['admin']), AdminController.rejectUpgradeRequest);
+// Removed upgrade request routes - feature no longer exists
 
-// User submits an upgrade request (with attachments)
-router.post('/upgrade-requests', authenticateToken, requireRole(['admin', 'seeker']), async (req, res) => {
-  try {
-    const { user } = req;
-    const { attachments, comment } = req.body;
-    if (!attachments || !Array.isArray(attachments) || attachments.length === 0) {
-      return res.status(400).json({ success: false, error: { message: 'يجب رفع صورة واحدة على الأقل' } });
-    }
-    // Validate all are image URLs
-    for (const url of attachments) {
-      if (typeof url !== 'string' || !url.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i)) {
-        return res.status(400).json({ success: false, error: { message: 'جميع المرفقات يجب أن تكون روابط صور صالحة' } });
-      }
-    }
-    const UpgradeRequest = (await import('../models/UpgradeRequest.js')).default;
-    // Check for existing pending request
-    const existing = await UpgradeRequest.findOne({ userId: user._id, status: 'pending' });
-    // Enforce max 3 requests per user
-    const totalRequests = await UpgradeRequest.countDocuments({ userId: user._id });
-    if (totalRequests >= 3) {
-      return res.status(400).json({ success: false, error: { message: 'لقد وصلت إلى الحد الأقصى لعدد محاولات الترقية (3 مرات)' } });
-    }
-    if (existing) {
-      return res.status(400).json({ success: false, error: { message: 'لديك طلب ترقية قيد الانتظار بالفعل' }, data: { request: existing } });
-    }
-    const newRequest = await UpgradeRequest.create({
-      userId: user._id,
-      attachments,
-      status: 'pending',
-      comment: comment || '',
-    });
-    res.json({ success: true, data: { request: newRequest } });
-  } catch (error) {
-    res.status(500).json({ success: false, error: { message: error.message } });
-  }
-});
+// Removed upgrade request submission - feature no longer exists
 
 /**
  * Update provider rating (temporary endpoint for testing)
