@@ -1,7 +1,7 @@
 import User from './User.js';
 import Admin from './Admin.js';
 import Category from './Category.js';
-import JobRequest from './JobRequest.js';
+import ServiceRequest from './JobRequest.js'; // Renamed from JobRequest
 import Offer from './Offer.js';
 import Review from './Review.js';
 import Conversation from './Conversation.js';
@@ -9,7 +9,6 @@ import Message from './Message.js';
 import Notification from './Notification.js';
 import Payment from './Payment.js';
 import Complaint from './Complaint.js';
-// Removed Ad import - feature no longer exists
 
 // Ensure discriminators are registered
 // This is important because the discriminator models need to be imported
@@ -19,7 +18,7 @@ export {
   User,
   Admin,
   Category,
-  JobRequest,
+  ServiceRequest, // Updated export name
   Offer,
   Review,
   Conversation,

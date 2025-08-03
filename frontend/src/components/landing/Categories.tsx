@@ -143,21 +143,6 @@ const Categories: React.FC = () => {
             <ArrowLeft className="w-4 h-4" />
           </Link>
         </div>
-        {/* Category Statistics */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <div className="bg-white rounded-xl p-6 shadow-lg">
-            <div className="text-3xl font-bold text-deep-teal mb-2">50+</div>
-            <div className="text-text-secondary">فئة خدمية</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-lg">
-            <div className="text-3xl font-bold text-deep-teal mb-2">5K+</div>
-            <div className="text-text-secondary">خدمة نشطة</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-lg">
-            <div className="text-3xl font-bold text-deep-teal mb-2">98%</div>
-            <div className="text-text-secondary">رضا العملاء</div>
-          </div>
-        </div>
       </div>
     </section>
   );

@@ -6,7 +6,7 @@ import socketService from './services/socketService.js';
 
 dotenv.config();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000; // Changed default port to 5000
 
 // Create HTTP server
 const server = http.createServer(app);

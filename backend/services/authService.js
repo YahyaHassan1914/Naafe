@@ -11,15 +11,12 @@ class AuthService {
    */
   async register(userData) {
     try {
-      // Default role is seeker
-      let roles = ['seeker'];
-      let seekerProfile = {};
-      let providerProfile = {};
-
-      // If admin is creating a provider, allow provider role
-      if (userData.roles && Array.isArray(userData.roles) && userData.roles.includes('provider')) {
-        roles = ['provider'];
-        providerProfile = {};
+      // Default role is seeker (as per our new requirements)
+      const role = userData.role || 'seeker';
+      
+      // Validate role
+      if (!['seeker', 'provider', 'admin'].includes(role)) {
+        throw new Error('Invalid role specified');
       }
 
       // Check if user already exists by email
@@ -38,13 +35,14 @@ class AuthService {
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
 
-      // Create new user
+      // Create new user with new model structure
       const newUser = new User({
         ...userData,
         password: hashedPassword,
-        roles,
-        seekerProfile,
-        providerProfile
+        role, // Single role field
+        verificationStatus: 'none', // Default verification status
+        seekerProfile: role === 'seeker' ? {} : undefined,
+        providerProfile: role === 'provider' ? {} : undefined
       });
 
       await newUser.save();
@@ -110,14 +108,14 @@ class AuthService {
         throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
       }
 
-      // Check if user is blocked
-      if (user.isBlocked) {
-        throw new Error('الحساب محظور. يرجى التواصل مع الدعم الفني.');
-      }
-
       // Check if user is active
       if (!user.isActive) {
-        throw new Error('الحساب معطل. يرجى التواصل مع الدعم الفني.');
+        throw new Error('الحساب معطل. يرجى التواصل مع الدعم الفني');
+      }
+
+      // Check if user is blocked
+      if (user.isBlocked) {
+        throw new Error(`الحساب محظور: ${user.blockedReason || 'لا يوجد سبب محدد'}`);
       }
 
       // Verify password
@@ -134,7 +132,7 @@ class AuthService {
       const accessToken = this.generateAccessToken(user);
       const refreshToken = this.generateRefreshToken(user);
 
-      // Return user data and tokens
+      // Return user without password
       const userResponse = user.toObject();
       delete userResponse.password;
 
@@ -154,15 +152,16 @@ class AuthService {
    * @returns {string} JWT access token
    */
   generateAccessToken(user) {
-    const payload = {
-      userId: user._id,
-      email: user.email,
-      roles: user.roles // include the array of roles
-    };
-
-    return jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: '24h'
-    });
+    return jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        role: user.role, // Updated to use single role field
+        isVerified: user.verificationStatus === 'approved'
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
   }
 
   /**
@@ -171,14 +170,15 @@ class AuthService {
    * @returns {string} JWT refresh token
    */
   generateRefreshToken(user) {
-    const payload = {
-      userId: user._id,
-      type: 'refresh'
-    };
-
-    return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
-      expiresIn: '7d'
-    });
+    return jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        role: user.role // Updated to use single role field
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
   }
 
   /**
@@ -190,7 +190,7 @@ class AuthService {
     try {
       return jwt.verify(token, process.env.JWT_SECRET);
     } catch (error) {
-      throw new Error('الرمز المميز غير صالح أو منتهي الصلاحية');
+      throw new Error('Invalid or expired access token');
     }
   }
 
@@ -201,16 +201,16 @@ class AuthService {
    */
   verifyRefreshToken(token) {
     try {
-      return jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+      return jwt.verify(token, process.env.JWT_SECRET);
     } catch (error) {
-      throw new Error('رمز التحديث غير صالح أو منتهي الصلاحية');
+      throw new Error('Invalid or expired refresh token');
     }
   }
 
   /**
    * Refresh access token using refresh token
    * @param {string} refreshToken - JWT refresh token
-   * @returns {Object} New access token
+   * @returns {Object} New access token and user data
    */
   async refreshAccessToken(refreshToken) {
     try {
@@ -218,14 +218,19 @@ class AuthService {
       
       // Find user
       const user = await User.findById(decoded.userId);
-      if (!user || user.isBlocked || !user.isActive) {
-        throw new Error('المستخدم غير موجود أو الحساب محظور');
+      if (!user || !user.isActive) {
+        throw new Error('User not found or inactive');
       }
 
       // Generate new access token
       const newAccessToken = this.generateAccessToken(user);
 
+      // Return user without password
+      const userResponse = user.toObject();
+      delete userResponse.password;
+
       return {
+        user: userResponse,
         accessToken: newAccessToken
       };
     } catch (error) {
@@ -242,21 +247,12 @@ class AuthService {
     try {
       const decoded = this.verifyAccessToken(token);
       
-      // Find user
       const user = await User.findById(decoded.userId);
-      if (!user) {
-        throw new Error('المستخدم غير موجود');
+      if (!user || !user.isActive) {
+        throw new Error('User not found or inactive');
       }
 
-      if (user.isBlocked) {
-        throw new Error('الحساب محظور');
-      }
-
-      if (!user.isActive) {
-        throw new Error('الحساب معطل');
-      }
-
-      // Return user data without password
+      // Return user without password
       const userResponse = user.toObject();
       delete userResponse.password;
 
@@ -269,24 +265,13 @@ class AuthService {
   /**
    * Request password reset
    * @param {string} email - User email
-   * @returns {Object} Success message
+   * @returns {Object} Reset token info
    */
   async forgotPassword(email) {
     try {
-      // Find user by email
       const user = await User.findOne({ email: email.toLowerCase() });
       if (!user) {
         throw new Error('البريد الإلكتروني غير مسجل');
-      }
-
-      // Check if user is blocked
-      if (user.isBlocked) {
-        throw new Error('الحساب محظور. يرجى التواصل مع الدعم الفني.');
-      }
-
-      // Check if user is active
-      if (!user.isActive) {
-        throw new Error('الحساب معطل. يرجى التواصل مع الدعم الفني.');
       }
 
       // Generate reset token
@@ -298,19 +283,11 @@ class AuthService {
       user.resetPasswordExpires = resetTokenExpiry;
       await user.save();
 
-      // For development - log to console
-      console.log(`\n🔗 Reset Password Link for ${email}:`);
-      console.log(`http://localhost:5173/reset-password?token=${resetToken}`);
-      console.log(`⏰ Expires at: ${resetTokenExpiry.toLocaleString('ar-EG')}`);
-      console.log(`\n📋 Instructions:`);
-      console.log(`1. Copy the link above`);
-      console.log(`2. Open it in your browser`);
-      console.log(`3. Enter your new password`);
-      console.log(`4. The link will expire in 1 hour\n`);
-
-      return { 
+      // TODO: Send email with reset link
+      // For now, return the token (in production, send via email)
+      return {
         message: 'تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني',
-        resetToken: resetToken // Only for development
+        resetToken: resetToken // Remove this in production
       };
     } catch (error) {
       throw error;
@@ -325,24 +302,13 @@ class AuthService {
    */
   async resetPassword(token, newPassword) {
     try {
-      // Find user by reset token
       const user = await User.findOne({
         resetPasswordToken: token,
         resetPasswordExpires: { $gt: Date.now() }
       });
 
       if (!user) {
-        throw new Error('رابط إعادة تعيين كلمة المرور غير صالح أو منتهي الصلاحية');
-      }
-
-      // Check if user is blocked
-      if (user.isBlocked) {
-        throw new Error('الحساب محظور. يرجى التواصل مع الدعم الفني.');
-      }
-
-      // Check if user is active
-      if (!user.isActive) {
-        throw new Error('الحساب معطل. يرجى التواصل مع الدعم الفني.');
+        throw new Error('رمز إعادة تعيين كلمة المرور غير صحيح أو منتهي الصلاحية');
       }
 
       // Hash new password
@@ -355,10 +321,8 @@ class AuthService {
       user.resetPasswordExpires = undefined;
       await user.save();
 
-      console.log(`✅ Password reset successful for ${user.email}`);
-
-      return { 
-        message: 'تم إعادة تعيين كلمة المرور بنجاح' 
+      return {
+        message: 'تم تغيير كلمة المرور بنجاح'
       };
     } catch (error) {
       throw error;
@@ -379,16 +343,6 @@ class AuthService {
         throw new Error('المستخدم غير موجود');
       }
 
-      // Check if account is blocked
-      if (user.isBlocked) {
-        throw new Error('الحساب محظور');
-      }
-
-      // Check if account is inactive
-      if (!user.isActive) {
-        throw new Error('الحساب معطل');
-      }
-
       // Verify current password
       const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
       if (!isCurrentPasswordValid) {
@@ -399,13 +353,13 @@ class AuthService {
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
 
-      // Update user password
+      // Update password
       user.password = hashedPassword;
       await user.save();
 
-      console.log(`✅ Password changed successfully for ${user.email}`);
-
-      return { message: 'تم تغيير كلمة المرور بنجاح' };
+      return {
+        message: 'تم تغيير كلمة المرور بنجاح'
+      };
     } catch (error) {
       throw error;
     }

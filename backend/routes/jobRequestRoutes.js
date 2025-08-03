@@ -8,7 +8,7 @@ import {
   validateCompleteJobRequest,
   validateOfferId
 } from '../validation/jobRequestValidation.js';
-import { authenticateToken, requireRole } from '../middlewares/auth.middleware.js';
+import { authenticateToken, requireSeeker, requireProvider, requireAdmin } from '../middlewares/auth.middleware.js';
 import { 
   createOfferValidation, 
   handleValidationErrors as offerValidationErrors 
@@ -19,33 +19,33 @@ const router = express.Router();
 
 /**
  * @route   POST /api/requests
- * @desc    Create a new job request
+ * @desc    Create a new service request
  * @access  Private (Seeker only)
  */
 router.post('/', 
   authenticateToken, 
-  requireRole(['seeker', 'provider']), 
+  requireSeeker, 
   validateCreateJobRequest, 
   jobRequestController.createJobRequest
 );
 
 /**
  * @route   GET /api/requests
- * @desc    Get all job requests with filtering
+ * @desc    Get all service requests with filtering
  * @access  Public
  */
 router.get('/', validateJobRequestQuery, jobRequestController.getAllJobRequests);
 
 /**
  * @route   GET /api/requests/:id
- * @desc    Get job request by ID
+ * @desc    Get service request by ID
  * @access  Public
  */
 router.get('/:id', validateJobRequestId, jobRequestController.getJobRequestById);
 
 /**
  * @route   PATCH /api/requests/:id
- * @desc    Update job request
+ * @desc    Update service request
  * @access  Private (Seeker who created it or Admin)
  */
 router.patch('/:id', 
@@ -57,7 +57,7 @@ router.patch('/:id',
 
 /**
  * @route   DELETE /api/requests/:id
- * @desc    Delete job request
+ * @desc    Delete service request
  * @access  Private (Seeker who created it or Admin)
  */
 router.delete('/:id', 
@@ -68,17 +68,17 @@ router.delete('/:id',
 
 /**
  * @route   POST /api/requests/:id/offers
- * @desc    Create an offer for a specific job request
+ * @desc    Create an offer for a specific service request
  * @access  Private (Providers only)
- * @param   {string} id - ID of the job request
+ * @param   {string} id - ID of the service request
  * @body    {object} price - Price object with amount and currency
  * @body    {string} [message] - Optional message from provider
  * @body    {number} [estimatedTimeDays] - Estimated completion time in days
- * @returns {object} Created offer with populated provider and job request details
+ * @returns {object} Created offer with populated provider and service request details
  */
 router.post('/:id/offers', 
   authenticateToken, 
-  requireRole(['provider']), 
+  requireProvider, 
   validateJobRequestId,
   createOfferValidation,
   offerValidationErrors,
@@ -87,9 +87,9 @@ router.post('/:id/offers',
 
 /**
  * @route   GET /api/requests/:id/offers
- * @desc    Get all offers for a specific job request
- * @access  Private (Job request owner or Admin)
- * @param   {string} id - ID of the job request
+ * @desc    Get all offers for a specific service request
+ * @access  Private (Service request owner or Admin)
+ * @param   {string} id - ID of the service request
  * @query   {string} [status] - Filter by offer status
  * @returns {object} Array of offers with populated provider details
  */
@@ -100,47 +100,45 @@ router.get('/:id/offers',
 );
 
 /**
- * @route   POST /api/requests/:id/assign/:offerId
- * @desc    Assign a selected offer to the job request
- * @access  Private (Job request owner only)
- * @param   {string} id - ID of the job request
- * @param   {string} offerId - ID of the offer to assign
- * @returns {object} Updated job request with assigned provider
+ * @route   GET /api/requests/:id/recommendations
+ * @desc    Get provider recommendations for a service request
+ * @access  Private (Service request owner)
+ * @param   {string} id - ID of the service request
+ * @returns {object} Array of recommended providers
  */
-router.post('/:id/assign/:offerId', 
+router.get('/:id/recommendations', 
   authenticateToken, 
-  requireRole(['seeker']), 
   validateJobRequestId,
-  validateOfferId,
-  jobRequestController.assignOfferToJobRequest
+  jobRequestController.getProviderRecommendations
 );
 
 /**
  * @route   POST /api/requests/:id/complete
- * @desc    Mark a job request as completed
- * @access  Private (Assigned provider only)
- * @param   {string} id - ID of the job request
- * @body    {array} [proofImages] - Array of proof image URLs
- * @body    {string} [description] - Completion description
- * @returns {object} Updated job request with completion details
+ * @desc    Mark service request as completed
+ * @access  Private (Service request owner or assigned provider)
+ * @param   {string} id - ID of the service request
+ * @body    {object} completionProof - Proof of completion
+ * @returns {object} Updated service request
  */
 router.post('/:id/complete', 
   authenticateToken, 
-  requireRole(['provider']), 
   validateJobRequestId,
   validateCompleteJobRequest,
   jobRequestController.completeJobRequest
 );
 
 /**
- * @route   POST /api/requests/:id/review
- * @desc    Submit a review for a completed job request
- * @access  Private (Seeker or Provider who participated)
+ * @route   POST /api/requests/:id/cancel
+ * @desc    Cancel a service request
+ * @access  Private (Service request owner or assigned provider)
+ * @param   {string} id - ID of the service request
+ * @body    {string} reason - Reason for cancellation
+ * @returns {object} Cancellation details
  */
-router.post('/:id/review', 
+router.post('/:id/cancel', 
   authenticateToken, 
   validateJobRequestId,
-  jobRequestController.submitReviewForJobRequest
+  jobRequestController.cancelJobRequest
 );
 
 export default router; 

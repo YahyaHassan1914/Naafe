@@ -54,8 +54,8 @@ export const requireRole = (roles) => {
       });
     }
 
-    // FIX: Check if any of the user's roles are allowed
-    if (!req.user.roles || !req.user.roles.some(r => roles.includes(r))) {
+    // Updated: Check if user's role is in the allowed roles array
+    if (!req.user.role || !roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         error: {
@@ -68,6 +68,50 @@ export const requireRole = (roles) => {
 
     next();
   };
+};
+
+/**
+ * Middleware to check if user is a seeker
+ */
+export const requireSeeker = requireRole(['seeker']);
+
+/**
+ * Middleware to check if user is a provider
+ */
+export const requireProvider = requireRole(['provider']);
+
+/**
+ * Middleware to check if user is an admin
+ */
+export const requireAdmin = requireRole(['admin']);
+
+/**
+ * Middleware to check if user is verified (for providers)
+ */
+export const requireVerified = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'المصادقة مطلوبة'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  if (req.user.role === 'provider' && req.user.verificationStatus !== 'approved') {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'FORBIDDEN',
+        message: 'يجب التحقق من حسابك أولاً'
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
 };
 
 /**

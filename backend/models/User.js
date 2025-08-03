@@ -1,26 +1,39 @@
 import mongoose from 'mongoose';
 const { Schema } = mongoose;
 
-// --- Enhanced Verification Schema ---
-const idVerificationSchema = new Schema({
+// --- Egypt-Specific Verification Schema ---
+const verificationSchema = new Schema({
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending',
+    enum: ['none', 'basic', 'skill', 'approved'],
+    default: 'none'
   },
-  explanation: { type: String, default: '' },
-  attempts: { type: Number, default: 0 }, // max 3
-  idFrontUrl: { type: String, required: true },
-  idBackUrl: { type: String, required: true },
-  selfieUrl: { type: String, required: true },
-  criminalRecordUrl: { type: String },
-  criminalRecordIssuedAt: { type: Date },
+  basicVerification: {
+    idCard: { type: String }, // URL to uploaded ID card
+    phoneVerified: { type: Boolean, default: false },
+    emailVerified: { type: Boolean, default: false },
+    verifiedAt: { type: Date }
+  },
+  skillVerification: {
+    portfolio: [{ type: String }], // URLs to portfolio images/videos
+    experience: { type: String }, // Years of experience description
+    learningMethod: { type: String, enum: ['apprenticeship', 'self_taught', 'family_business', 'formal_education'] },
+    references: [{ type: String }], // Previous client testimonials
+    practicalTest: { type: String }, // URL to practical demonstration
+    verifiedAt: { type: Date }
+  },
+  categorySpecific: {
+    tools: [{ type: String }], // Photos of professional tools
+    safetyKnowledge: { type: String }, // Safety assessment
+    workSamples: [{ type: String }], // Before/after photos
+    verifiedAt: { type: Date }
+  },
   submittedAt: { type: Date, default: Date.now },
   reviewedAt: { type: Date },
   reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   auditTrail: [
     {
-      action: { type: String, enum: ['submitted', 'approved', 'rejected', 'blocked', 'unblocked'], required: true },
+      action: { type: String, enum: ['submitted', 'basic_approved', 'skill_approved', 'rejected', 'blocked'], required: true },
       by: { type: Schema.Types.ObjectId, ref: 'User' },
       at: { type: Date, default: Date.now },
       explanation: String,
@@ -32,8 +45,9 @@ const seekerProfileSchema = new Schema({
   totalJobsPosted: { type: Number, default: 0 },
   rating: { type: Number, default: 0, min: 0, max: 5 },
   reviewCount: { type: Number, default: 0, min: 0 },
-  totalSpent: { type: Number, default: 0, min: 0 }
-  // Removed verification
+  totalSpent: { type: Number, default: 0, min: 0 },
+  preferredPaymentMethods: [{ type: String, enum: ['cod', 'bank_transfer', 'cash', 'vodafone_cash', 'meeza', 'fawry', 'stripe'] }],
+  communicationStyle: { type: String, enum: ['text', 'voice', 'both'], default: 'text' }
 }, { _id: false });
 
 const providerProfileSchema = new Schema({
@@ -41,11 +55,20 @@ const providerProfileSchema = new Schema({
   reviewCount: { type: Number, default: 0, min: 0 },
   totalJobsCompleted: { type: Number, default: 0, min: 0 },
   totalEarnings: { type: Number, default: 0, min: 0 },
-  skills: { type: [String], default: [] },
-  workingDays: { type: [String], default: [] }, // Added for availability
-  startTime: { type: String, default: '' },     // Added for availability
-  endTime: { type: String, default: '' }        // Added for availability
-  // Removed verification
+  skills: [{ 
+    category: { type: String, required: true },
+    subcategory: { type: String, required: true },
+    verified: { type: Boolean, default: false }
+  }],
+  workingDays: { type: [String], default: [] }, // ['monday', 'tuesday', etc.]
+  startTime: { type: String, default: '' },     // "09:00"
+  endTime: { type: String, default: '' },       // "17:00"
+  pricingRange: {
+    min: { type: Number, default: 0 },
+    max: { type: Number, default: 0 }
+  },
+  responseTime: { type: Number, default: 0 }, // Average response time in minutes
+  completionRate: { type: Number, default: 100, min: 0, max: 100 } // Percentage
 }, { _id: false });
 
 const subscriptionSchema = new Schema({
@@ -114,10 +137,15 @@ const userSchema = new Schema({
         type: String,
         default: null
     },
-    roles: {
-        type: [String],
-        enum: ['admin', 'seeker', 'provider'],
-        default: ['seeker']
+    role: {
+        type: String,
+        enum: ['seeker', 'provider', 'admin'],
+        default: 'seeker'
+    },
+    verificationStatus: {
+        type: String,
+        enum: ['none', 'basic', 'skill', 'approved'],
+        default: 'none'
     },
     isPremium: {
         type: Boolean,
@@ -129,16 +157,7 @@ const userSchema = new Schema({
         default: false,
         description: 'Whether the user is top-rated (computed based on rating and job count)'
     },
-    isVerified: {
-        type: Boolean,
-        default: false
-    },
-    verification: { type: idVerificationSchema, default: undefined },
-    providerUpgradeStatus: {
-        type: String,
-        enum: ['none', 'pending', 'accepted', 'rejected'],
-        default: 'none'
-    },
+    verification: { type: verificationSchema, default: undefined },
     seekerProfile: { type: seekerProfileSchema, default: () => ({}) },
     providerProfile: { type: providerProfileSchema, default: () => ({}) },
     subscription: { type: subscriptionSchema, default: () => ({}) },
@@ -153,7 +172,7 @@ const userSchema = new Schema({
             trim: true
         },
         location: {
-            government: { type: String, default: '' },
+            governorate: { type: String, default: '' },
             city: { type: String, default: '' },
             street: { type: String, default: '' },
             apartmentNumber: { type: String, default: '' },
@@ -182,18 +201,16 @@ const userSchema = new Schema({
     },
     savedServices: [{
         type: Schema.Types.ObjectId,
-        ref: 'JobRequest'
+        ref: 'ServiceRequest'
     }]
 }, {
     timestamps: true
 });
 
-// All user types (seeker, provider, admin) are managed via the roles array and their respective subdocuments.
-
-// Remove geolocation index
-// userSchema.index({ 'profile.location': '2dsphere' });
-userSchema.index({ roles: 1, isActive: 1 });
-userSchema.index({ 'providerProfile.verification.status': 1, roles: 1 });
+// Indexes
+userSchema.index({ role: 1, isActive: 1 });
+userSchema.index({ verificationStatus: 1, role: 1 });
+userSchema.index({ 'providerProfile.rating': -1, 'providerProfile.totalJobsCompleted': -1 });
 
 userSchema.virtual('fullName').get(function () {
     return `${this.name.first} ${this.name.last}`;
@@ -201,12 +218,12 @@ userSchema.virtual('fullName').get(function () {
 
 // Virtual field to check if provider is verified
 userSchema.virtual('isProviderVerified').get(function () {
-  return this.providerProfile && this.providerProfile.verification && this.providerProfile.verification.status === 'verified';
+  return this.role === 'provider' && this.verificationStatus === 'approved';
 });
 
 // Method to compute and update isTopRated status
 userSchema.methods.updateTopRatedStatus = function() {
-  if (this.roles.includes('provider') && this.providerProfile) {
+  if (this.role === 'provider' && this.providerProfile) {
     const { rating, reviewCount, totalJobsCompleted } = this.providerProfile;
     const isVerified = this.isProviderVerified;
     
@@ -223,7 +240,7 @@ userSchema.pre('save', function(next) {
   if (this.isModified('providerProfile.rating') || 
       this.isModified('providerProfile.reviewCount') || 
       this.isModified('providerProfile.totalJobsCompleted') ||
-      this.isModified('providerProfile.verification.status')) {
+      this.isModified('verificationStatus')) {
     this.updateTopRatedStatus();
   }
   next();
