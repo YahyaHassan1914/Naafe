@@ -136,7 +136,7 @@ const RequestSuccessPage: React.FC = () => {
                                        <Button
                 variant="outline"
                 leftIcon={<Users className="w-4 h-4" />}
-                onClick={() => navigate('/search/providers')}
+                onClick={() => navigate('/search?intent=need-service')}
               >
                 استكشف المحترفين
               </Button>

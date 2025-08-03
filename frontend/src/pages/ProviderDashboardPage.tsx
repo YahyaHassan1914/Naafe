@@ -175,12 +175,12 @@ const ProviderDashboardPage: React.FC = () => {
           <BaseCard className="mb-8">
                          <h2 className="text-xl font-bold text-deep-teal mb-4">أعمال سريعة</h2>
             <div className="flex flex-col md:flex-row gap-4">
-              <Button
-                variant="primary"
-                leftIcon={<Eye className="w-4 h-4" />}
-                onClick={() => navigate('/search/service-requests')}
-                className="min-w-fit"
-              >
+                             <Button
+                 variant="primary"
+                 leftIcon={<Eye className="w-4 h-4" />}
+                 onClick={() => navigate('/search?intent=want-work')}
+                 className="min-w-fit"
+               >
                 شوف الطلبات الجديدة
               </Button>
               <Button
@@ -206,11 +206,11 @@ const ProviderDashboardPage: React.FC = () => {
           <BaseCard>
             <div className="flex justify-between items-center mb-6">
                              <h2 className="text-xl font-bold text-deep-teal">طلبات جديدة في مجالك</h2>
-              <Button
-                variant="outline"
-                rightIcon={<ArrowRight className="w-4 h-4" />}
-                onClick={() => navigate('/search/service-requests')}
-              >
+                             <Button
+                 variant="outline"
+                 rightIcon={<ArrowRight className="w-4 h-4" />}
+                 onClick={() => navigate('/search?intent=want-work')}
+               >
                 عرض الكل
               </Button>
             </div>
@@ -258,11 +258,11 @@ const ProviderDashboardPage: React.FC = () => {
               <div className="text-center py-8 text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                                  <p>مفيش طلبات جديدة في مجالك دلوقتي</p>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/search/service-requests')}
-                  className="mt-4"
-                >
+                                 <Button
+                   variant="outline"
+                   onClick={() => navigate('/search?intent=want-work')}
+                   className="mt-4"
+                 >
                   شوف كل الطلبات
                 </Button>
               </div>

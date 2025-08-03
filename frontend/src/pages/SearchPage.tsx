@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import PageLayout from '../components/layout/PageLayout';
-import FilterForm from '../components/ui/FilterForm';
 import ServiceCard from '../components/ServiceCard';
 import ServiceRequestCard from '../components/ServiceRequestCard';
 import Button from '../components/ui/Button';
@@ -10,34 +9,17 @@ import { useQuery } from '@tanstack/react-query';
 import { FilterState } from '../types';
 import { useUrlParams } from '../hooks/useUrlParams';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Users, FileText, ArrowLeft, CheckCircle } from 'lucide-react';
-import AdPlacement from '../components/ui/AdPlacement';
-import FeaturedProviders from '../components/FeaturedProviders';
+import { Search, Users, FileText, MapPin, DollarSign, Star, Clock, Eye, Plus } from 'lucide-react';
 
-const fetchListings = async (filters: FilterState) => {
+// Smart data fetching functions with defaults
+const fetchListings = async (searchQuery: string, category?: string) => {
   const params = new URLSearchParams();
-  if (filters.category) params.set('category', filters.category);
-  if (filters.search) params.set('search', filters.search);
-  if (filters.premiumOnly) params.set('premiumOnly', 'true');
-  if (filters.location) params.set('location', filters.location);
-  if (filters.city) params.set('city', filters.city);
+  if (searchQuery) params.set('search', searchQuery);
+  if (category) params.set('category', category);
   
-  // Convert priceRange to minPrice and maxPrice
-  if (filters.priceRange) {
-    const priceRanges = {
-      'VERY_LOW': { min: 0, max: 100 },
-      'LOW': { min: 100, max: 300 },
-      'MEDIUM': { min: 300, max: 500 },
-      'HIGH': { min: 500, max: 1000 },
-      'VERY_HIGH': { min: 1000, max: null }
-    };
-    
-    const range = priceRanges[filters.priceRange as keyof typeof priceRanges];
-    if (range) {
-      if (range.min !== null) params.set('minPrice', range.min.toString());
-      if (range.max !== null) params.set('maxPrice', range.max.toString());
-    }
-  }
+  // Add smart defaults for better UX
+  params.set('limit', '20'); // Limit results to avoid overwhelming
+  params.set('sort', 'rating'); // Show best providers first
   
   const res = await fetch(`/api/listings/listings?${params.toString()}`);
   const json = await res.json();
@@ -45,29 +27,15 @@ const fetchListings = async (filters: FilterState) => {
   return json.data.listings || json.data.items || [];
 };
 
-const fetchRequests = async (filters: FilterState) => {
+const fetchRequests = async (searchQuery: string, category?: string) => {
   const params = new URLSearchParams();
-  if (filters.category) params.set('category', filters.category);
-  if (filters.search) params.set('search', filters.search);
-  if (filters.location) params.set('location', filters.location);
-  if (filters.city) params.set('city', filters.city);
+  if (searchQuery) params.set('search', searchQuery);
+  if (category) params.set('category', category);
   
-  // Convert priceRange to minPrice and maxPrice for requests
-  if (filters.priceRange) {
-    const priceRanges = {
-      'VERY_LOW': { min: 0, max: 100 },
-      'LOW': { min: 100, max: 300 },
-      'MEDIUM': { min: 300, max: 500 },
-      'HIGH': { min: 500, max: 1000 },
-      'VERY_HIGH': { min: 1000, max: null }
-    };
-    
-    const range = priceRanges[filters.priceRange as keyof typeof priceRanges];
-    if (range) {
-      if (range.min !== null) params.set('minBudget', range.min.toString());
-      if (range.max !== null) params.set('maxBudget', range.max.toString());
-    }
-  }
+  // Add smart defaults for better UX
+  params.set('limit', '20'); // Limit results to avoid overwhelming
+  params.set('sort', 'recent'); // Show recent requests first
+  params.set('status', 'open'); // Only show open requests
   
   const res = await fetch(`/api/requests?${params.toString()}`);
   const json = await res.json();
@@ -75,504 +43,392 @@ const fetchRequests = async (filters: FilterState) => {
   return json.data.requests || json.data.jobRequests || json.data.items || [];
 };
 
-type SearchType = 'providers' | 'service-requests' | null;
-
-// Add a minimal JobRequest type for targeted leads
-interface JobRequestLead {
-  _id: string;
-  title: string;
-  description: string;
-  category: string;
-  location?: { government?: string; city?: string };
-  budget?: { min?: number; max?: number };
-  createdAt?: string;
-  seeker?: { avatarUrl?: string; isVerified?: boolean };
-  requiredSkills?: string[];
-}
+type UserIntent = 'need-service' | 'want-work';
 
 const SearchPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, accessToken } = useAuth();
-  const { getFiltersFromUrl, updateFiltersInUrl } = useUrlParams();
+  const { user } = useAuth();
+  const { getFiltersFromUrl } = useUrlParams();
   
-  // Determine search type from URL
-  const getSearchTypeFromUrl = (): SearchType => {
-    if (location.pathname.includes('/providers')) return 'providers';
-    if (location.pathname.includes('/service-requests')) return 'service-requests';
-    return null;
-  };
-
-  const [searchType, setSearchType] = useState<SearchType>(getSearchTypeFromUrl());
-  const [filters, setFilters] = useState<FilterState>(getFiltersFromUrl());
+  // Simple state management
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userIntent, setUserIntent] = useState<UserIntent>('need-service');
+  const [selectedCategory, setSelectedCategory] = useState('');
   
-  const { data: listings = [], isLoading: listingsLoading, error: listingsError } = useQuery({
-    queryKey: ['listings', filters.search, filters.category, filters.premiumOnly, filters.location, filters.priceRange, filters.rating],
-    queryFn: () => fetchListings(filters),
-  });
-  const { data: requests = [], isLoading: requestsLoading, error: requestsError } = useQuery({
-    queryKey: ['requests', filters.search, filters.category, filters.location, filters.city, filters.priceRange],
-    queryFn: () => fetchRequests(filters),
-  });
-  const [providerOfferRequestIds, setProviderOfferRequestIds] = useState<string[]>([]);
-
-  const isProvider = user?.roles?.includes('provider');
-  const isPremium = !!user?.isPremium;
-  // Targeted Leads state
-  const [leads, setLeads] = useState<JobRequestLead[]>([]);
-  const [leadsLoading, setLeadsLoading] = useState(false);
-  const [leadsError, setLeadsError] = useState<string | null>(null);
-  const [leadFilters, setLeadFilters] = useState({ minBudget: '', maxBudget: '', government: '', city: '' });
-
-  // Add express interest state
-  const [interestSuccess, setInterestSuccess] = useState<string | null>(null);
-  const handleExpressInterest = (leadId: string) => {
-    setInterestSuccess('تم إرسال اهتمامك بنجاح! سيتم إعلام صاحب الطلب.');
-    setTimeout(() => setInterestSuccess(null), 2500);
-    // In a real implementation, you would POST to an endpoint here
-  };
-
-  // Update search type when URL changes
+  // Get initial search query from URL
   useEffect(() => {
-    setSearchType(getSearchTypeFromUrl());
-  }, [location.pathname]);
+    const urlParams = new URLSearchParams(location.search);
+    const query = urlParams.get('query') || '';
+    const category = urlParams.get('category') || '';
+    const intent = urlParams.get('intent') as UserIntent || 'need-service';
+    
+    setSearchQuery(query);
+    setSelectedCategory(category);
+    setUserIntent(intent);
+  }, [location.search]);
 
-  // Simplified provider processing without heavy async operations
-  const resolvedProviders = (listings as unknown[]).map((listing: unknown) => {
-    const l = listing as Record<string, unknown>;
-    let providerName = 'مزود خدمة غير معروف';
-    let memberSince = '';
-    let address = '';
-    let budgetMin = 0;
-    let budgetMax = 0;
-    let providerId = '';
-    let provider: Record<string, unknown> = {};
-    
-    if (l.provider && typeof l.provider === 'object' && 'name' in l.provider) {
-      provider = l.provider as Record<string, unknown>;
-      providerId = provider._id as string || '';
-      if (provider.name && typeof provider.name === 'object' && provider.name !== null) {
-        const nameObj = provider.name as { first?: string; last?: string };
-        providerName = `${nameObj.first || ''} ${nameObj.last || ''}`.trim() || providerName;
-      } else if (typeof provider.name === 'string') {
-        providerName = provider.name;
-      }
-      if ('createdAt' in provider && typeof provider.createdAt === 'string') {
-        memberSince = provider.createdAt;
-      }
-    }
-    
-    if (l.location && typeof l.location === 'object') {
-      const loc = l.location as Record<string, unknown>;
-      const gov = loc.government as string || '';
-      const city = loc.city as string || '';
-      address = [gov, city].filter(Boolean).join('، ');
-    }
-    if (!address) address = 'غير محدد';
-    
-    if (l.budget && typeof l.budget === 'object') {
-      budgetMin = (l.budget as Record<string, unknown>).min as number || 0;
-      budgetMax = (l.budget as Record<string, unknown>).max as number || 0;
-    }
-    
-    const upgradeStatus = provider && 'providerUpgradeStatus' in provider 
-      ? provider.providerUpgradeStatus as string 
-      : 'none';
-    const validUpgradeStatus = ['none', 'pending', 'accepted', 'rejected'].includes(upgradeStatus) 
-      ? upgradeStatus as 'none' | 'pending' | 'accepted' | 'rejected' 
-      : 'none';
-    
-    return {
-      id: l._id as string,
-      providerId: providerId || '',
-      name: providerName,
-      rating: 0, // Default rating, can be enhanced later
-      reviewCount: 0, // Default review count
-      completedJobs: 0, // Default completed jobs
-      completionRate: 0, // Default completion rate
-      skills: (provider.providerProfile && Array.isArray((provider.providerProfile as { skills?: string[] }).skills)) ? (provider.providerProfile as { skills?: string[] }).skills! : [],
-      workingDays: (provider.providerProfile && Array.isArray((provider.providerProfile as { workingDays?: string[] }).workingDays)) ? (provider.providerProfile as { workingDays?: string[] }).workingDays! : (l.workingDays as string[] || []),
-      startTime: (provider.providerProfile && (provider.providerProfile as { startTime?: string }).startTime) ? (provider.providerProfile as { startTime?: string }).startTime! : (l.startTime as string || ''),
-      endTime: (provider.providerProfile && (provider.providerProfile as { endTime?: string }).endTime) ? (provider.providerProfile as { endTime?: string }).endTime! : (l.endTime as string || ''),
-      category: l.category as string,
-      description: l.description as string,
-      title: l.title as string,
-      location: address,
-      budgetMin,
-      budgetMax,
-      memberSince,
-      startingPrice: budgetMin,
-      imageUrl: provider && 'avatarUrl' in provider ? provider.avatarUrl as string : '',
-      isPremium: provider && 'isPremium' in provider ? provider.isPremium as boolean : false,
-      isTopRated: provider && 'isTopRated' in provider ? provider.isTopRated as boolean : false,
-      isIdentityVerified: provider && 'isVerified' in provider ? provider.isVerified as boolean : false,
-      isVerified: provider && 'isVerified' in provider ? provider.isVerified as boolean : false,
-      providerUpgradeStatus: validUpgradeStatus,
-      availability: l.availability as { days: string[]; timeSlots: string[] } || { days: [], timeSlots: [] },
-    };
+  // Fetch data based on search with smart defaults
+  const { data: providers = [], isLoading: providersLoading } = useQuery({
+    queryKey: ['providers', searchQuery, selectedCategory, userIntent],
+    queryFn: () => fetchListings(searchQuery, selectedCategory),
+    enabled: userIntent === 'need-service',
+    // Always fetch for seekers - show relevant results even without search
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const mappedRequests = (requests as unknown[]).map((req) => {
-    const r = req as Record<string, unknown>;
-    const urgencyValue = r.urgency as string;
-    const validUrgency = ['low', 'medium', 'high'].includes(urgencyValue) ? urgencyValue as 'low' | 'medium' | 'high' : 'medium';
-    const statusValue = r.status as string;
-    const validStatus = ['open', 'assigned', 'in_progress', 'completed', 'cancelled'].includes(statusValue) ? statusValue as 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' : 'open';
-    
-    return {
-      id: r._id as string,
-      title: r.title as string,
-      description: r.description as string,
-      budget: r.budget as { min: number; max: number; currency: string },
-      location: r.location && typeof r.location === 'object' && 'address' in r.location ? (r.location as Record<string, unknown>).address as string : '',
-      postedBy: {
-        id: (r.seeker as Record<string, unknown>)?._id as string || '',
-        name: (r.seeker as Record<string, unknown>)?.name ? `${((r.seeker as Record<string, unknown>).name as Record<string, unknown>)?.first} ${((r.seeker as Record<string, unknown>).name as Record<string, unknown>)?.last}` : '',
-        avatar: (r.seeker as Record<string, unknown>)?.avatarUrl as string || '',
-        isPremium: (r.seeker as Record<string, unknown>)?.isPremium as boolean || false,
-      },
-      timePosted: r.createdAt as string || new Date().toISOString(),
-      createdAt: r.createdAt as string || new Date().toISOString(),
-      responses: r.offersCount as number || 0,
-      urgency: validUrgency,
-      deadline: r.deadline as string || '',
-      requiredSkills: r.requiredSkills as string[] || [],
-      status: validStatus,
-      category: r.category as string || '',
-      availability: r.availability as { days: string[]; timeSlots: string[] } || { days: [], timeSlots: [] },
-    };
+  const { data: requests = [], isLoading: requestsLoading } = useQuery({
+    queryKey: ['requests', searchQuery, selectedCategory, userIntent],
+    queryFn: () => fetchRequests(searchQuery, selectedCategory),
+    enabled: userIntent === 'want-work',
+    // Always fetch for providers - show relevant requests even without search
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Remove automatic URL updates to prevent infinite loops
-  // URL will be updated manually when filters change
+  // Process providers data
+  const processedProviders = providers.map((listing: any) => ({
+    id: listing._id,
+    providerId: listing.provider?._id || '',
+    name: listing.provider?.name ? 
+      `${listing.provider.name.first || ''} ${listing.provider.name.last || ''}`.trim() : 
+      'مزود خدمة',
+    category: listing.category,
+    description: listing.description,
+    title: listing.title,
+    location: listing.location ? 
+      `${listing.location.government || ''} ${listing.location.city || ''}`.trim() : 
+      'غير محدد',
+    budgetMin: listing.budget?.min || 0,
+    budgetMax: listing.budget?.max || 0,
+    rating: 0,
+    reviewCount: 0,
+    completedJobs: 0,
+    completionRate: 0,
+    skills: listing.provider?.providerProfile?.skills || [],
+    imageUrl: listing.provider?.avatarUrl || '',
+    isPremium: listing.provider?.isPremium || false,
+    isTopRated: listing.provider?.isTopRated || false,
+    isVerified: listing.provider?.isVerified || false,
+    memberSince: listing.provider?.createdAt || '',
+    availability: listing.availability || { days: [], timeSlots: [] },
+    providerUpgradeStatus: 'none' as const
+  }));
 
-  useEffect(() => {
-    const fetchProviderOffers = async () => {
-      if (user && user.roles.includes('provider') && searchType === 'service-requests') {
-        try {
-          type Offer = { jobRequest: string };
-          const res = await fetch('/api/offers', {
-            headers: { 'Authorization': `Bearer ${accessToken || localStorage.getItem('accessToken')}` },
-          });
-          const data = await res.json();
-          if (data.success && Array.isArray(data.data)) {
-            setProviderOfferRequestIds(data.data.map((offer: Offer) => offer.jobRequest));
-          }
-        } catch {
-          // Optionally log error
-        }
-      }
-    };
-    fetchProviderOffers();
-  }, [user, searchType, accessToken]);
+  // Process requests data
+  const processedRequests = requests.map((request: any) => ({
+    id: request._id,
+    title: request.title,
+    description: request.description,
+    budget: request.budget || { min: 0, max: 0, currency: 'EGP' },
+    location: request.location?.address || 'غير محدد',
+    category: request.category,
+    postedBy: {
+      id: request.seeker?._id || '',
+      name: request.seeker?.name ? 
+        `${request.seeker.name.first || ''} ${request.seeker.name.last || ''}`.trim() : 
+        'مستخدم',
+      avatar: request.seeker?.avatarUrl || '',
+      isPremium: request.seeker?.isPremium || false,
+    },
+    timePosted: request.createdAt || new Date().toISOString(),
+    createdAt: request.createdAt || new Date().toISOString(),
+    responses: request.offersCount || 0,
+    urgency: request.urgency || 'medium',
+    deadline: request.deadline || '',
+    requiredSkills: request.requiredSkills || [],
+    status: request.status || 'open',
+    availability: request.availability || { days: [], timeSlots: [] },
+  }));
 
-  const fetchLeads = async () => {
-    setLeadsLoading(true);
-    setLeadsError(null);
-    try {
-      const params = new URLSearchParams();
-      if (leadFilters.minBudget) params.set('minBudget', leadFilters.minBudget);
-      if (leadFilters.maxBudget) params.set('maxBudget', leadFilters.maxBudget);
-      if (leadFilters.government) params.set('location.government', leadFilters.government);
-      if (leadFilters.city) params.set('location.city', leadFilters.city);
-      const res = await fetch(`/api/users/providers/me/targeted-leads?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const data = await res.json();
-      if (data.success) setLeads(data.data.leads || []);
-      else setLeadsError(data.error?.message || 'فشل تحميل العروض المستهدفة');
-    } catch {
-      setLeadsError('فشل تحميل العروض المستهدفة');
-    } finally {
-      setLeadsLoading(false);
-    }
-  };
+  // Popular categories for quick access
+  const popularCategories = [
+    'سباكة', 'كهرباء', 'نجارة', 'نقاشة', 'تنظيف', 'تكييفات',
+    'صيانة أجهزة', 'نقل عفش', 'توصيل', 'دروس خصوصية'
+  ];
 
-  useEffect(() => {
-    if (searchType === 'service-requests' && isProvider && isPremium) fetchLeads();
-    // eslint-disable-next-line
-  }, [searchType, isProvider, isPremium]);
-
+  // Handle search
   const handleSearch = (query: string) => {
-    setFilters(prev => ({ ...prev, search: query }));
+    setSearchQuery(query);
+    // Update URL
+    const params = new URLSearchParams();
+    if (query) params.set('query', query);
+    if (selectedCategory) params.set('category', selectedCategory);
+    navigate(`/search?${params.toString()}`, { replace: true });
   };
 
-  const handleFiltersChange = useCallback((newFilters: FilterState) => {
-    setFilters(newFilters);
-  }, []);
-
-  const handleClearFilters = () => {
-    setFilters({
-      search: '',
-      location: '',
-      city: '',
-      priceRange: '',
-      rating: '',
-      category: '',
-      premiumOnly: false,
-      workingDays: [],
-      availability: { days: [], timeSlots: [] }
-    });
+  // Handle category selection
+  const handleCategorySelect = (category: string) => {
+    setSelectedCategory(category);
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('query', searchQuery);
+    params.set('category', category);
+    navigate(`/search?${params.toString()}`, { replace: true });
   };
 
-  const handleViewProviderDetails = (providerId: string) => {
+  // Handle provider selection
+  const handleViewProvider = (providerId: string) => {
     navigate(`/provider/${providerId}`);
   };
 
-  const handleViewRequestDetails = (requestId: string) => {
-    navigate(`/requests/${requestId}`, { 
-      state: { from: searchType === 'service-requests' ? '/search/service-requests' : '/search' }
-    });
+  // Handle request selection
+  const handleViewRequest = (requestId: string) => {
+    navigate(`/requests/${requestId}`);
   };
 
-  const handleInterestedInRequest = (requestId: string) => {
+  const handleApplyToRequest = (requestId: string) => {
     navigate(`/requests/${requestId}/respond`);
   };
 
-  const handleChoiceSelection = (type: SearchType) => {
-    if (type === 'providers') {
-      navigate('/search/providers', { replace: true });
-    } else if (type === 'service-requests') {
-      navigate('/search/service-requests', { replace: true });
-    }
-    setSearchType(type);
-  };
+  // Render search interface
+  const renderSearchInterface = () => (
+    <div className="max-w-4xl mx-auto">
+      {/* Intent Toggle */}
+      <div className="mb-8">
+        <div className="bg-white rounded-2xl p-2 shadow-sm border">
+          <div className="flex">
+            <button
+              onClick={() => setUserIntent('need-service')}
+              className={`flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl font-medium transition-all ${
+                userIntent === 'need-service'
+                  ? 'bg-deep-teal text-white shadow-md'
+                  : 'text-gray-600 hover:text-deep-teal'
+              }`}
+            >
+              <Users className="w-5 h-5" />
+              محتاج حد يشتغللي
+            </button>
+            <button
+              onClick={() => setUserIntent('want-work')}
+              className={`flex-1 flex items-center justify-center gap-3 py-4 px-6 rounded-xl font-medium transition-all ${
+                userIntent === 'want-work'
+                  ? 'bg-deep-teal text-white shadow-md'
+                  : 'text-gray-600 hover:text-deep-teal'
+              }`}
+            >
+              <FileText className="w-5 h-5" />
+              عايز أشغل
+            </button>
+          </div>
+        </div>
+      </div>
 
-  const handleBackToChoice = () => {
-    navigate('/search', { replace: true });
-    setSearchType(null);
-  };
+      {/* Search Input */}
+      <div className="mb-8">
+        <div className="relative">
+          <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder={
+              userIntent === 'need-service' 
+                ? "محتاج سباك؟ نجار؟ حد ينضف؟ اكتب اللي محتاجه هنا..."
+                : "ابحث عن طلبات في مجالك..."
+            }
+            className="w-full pl-4 pr-12 py-4 text-lg border-2 border-gray-200 rounded-2xl focus:border-deep-teal focus:outline-none transition-colors"
+          />
+        </div>
+      </div>
 
-  const breadcrumbItems = [
-    { label: 'الرئيسية', href: '/' },
-    { label: 'البحث', href: '/search' },
-    ...(searchType ? [{ 
-      label: searchType === 'providers' ? 'مقدمو الخدمات' : 'طلبات الخدمات', 
-      active: true 
-    }] : [{ label: 'نوع البحث', active: true }])
-  ];
+      {/* Popular Categories */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-700 mb-4">خدمات شائعة</h3>
+        <div className="flex flex-wrap gap-3">
+          {popularCategories.map((category) => (
+            <button
+              key={category}
+              onClick={() => handleCategorySelect(category)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                selectedCategory === category
+                  ? 'bg-deep-teal text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
-  const renderEmptyState = () => (
-    <div className="text-center py-12">
-      <BaseCard className="p-8">
-        <h3 className="text-xl font-semibold text-text-primary mb-2">
-          {searchType === 'providers' ? 'لم يتم العثور على مزودي خدمات' : 'لم يتم العثور على طلبات خدمات'}
-        </h3>
-        <p className="text-text-secondary mb-4">
-          {searchType === 'providers' 
-            ? 'حاول تعديل المرشحات أو مصطلحات البحث للعثور على ما تبحث عنه.'
-            : 'حاول تعديل المرشحات أو مصطلحات البحث للعثور على طلبات الخدمات المناسبة.'
-          }
-        </p>
-        <div className="flex gap-3 justify-center">
-          <Button
-            variant="primary"
-            onClick={handleClearFilters}
-          >
-            مسح جميع المرشحات
-          </Button>
-          {searchType === 'service-requests' && (
+  // Render results
+  const renderResults = () => {
+    if (userIntent === 'need-service') {
+      if (providersLoading) {
+        return (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-deep-teal mx-auto mb-4"></div>
+            <p className="text-gray-600">جاري البحث عن المحترفين...</p>
+          </div>
+        );
+      }
+
+      if (processedProviders.length === 0 && (searchQuery || selectedCategory)) {
+        return (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">مفيش محترفين متاحين</h3>
+            <p className="text-gray-600 mb-6">جرب تعديل البحث أو اختر فئة مختلفة</p>
             <Button
               variant="outline"
-              onClick={() => navigate('/post-request')}
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('');
+              }}
             >
-              نشر طلب خدمة جديد
+              مسح البحث
             </Button>
-          )}
-        </div>
-      </BaseCard>
-    </div>
-  );
+          </div>
+        );
+      }
 
-  const renderChoiceScreen = () => (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <BaseCard className="max-w-2xl w-full p-12 text-center">
-        <div className="mb-8">
-          <Search className="w-16 h-16 text-deep-teal mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-text-primary mb-3">ماذا تبحث عن؟</h2>
-          <p className="text-lg text-text-secondary">اختر نوع البحث للعثور على ما تحتاجه</p>
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {processedProviders.map((provider) => (
+            <ServiceCard
+              key={provider.id}
+              provider={provider}
+              onViewDetails={() => handleViewProvider(provider.providerId || provider.id)}
+            />
+          ))}
         </div>
-        
+      );
+    } else {
+      if (requestsLoading) {
+        return (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-deep-teal mx-auto mb-4"></div>
+            <p className="text-gray-600">جاري البحث عن الطلبات...</p>
+          </div>
+        );
+      }
+
+      if (processedRequests.length === 0 && (searchQuery || selectedCategory)) {
+        return (
+          <div className="text-center py-12">
+            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">مفيش طلبات متاحة</h3>
+            <p className="text-gray-600 mb-6">جرب تعديل البحث أو اختر فئة مختلفة</p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCategory('');
+              }}
+            >
+              مسح البحث
+            </Button>
+          </div>
+        );
+      }
+
+      return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <button
-            onClick={() => handleChoiceSelection('providers')}
-            className="group p-8 rounded-xl border-2 border-gray-200 hover:border-deep-teal transition-all duration-300 hover:shadow-lg hover:bg-soft-teal/5"
-          >
-            <Users className="w-12 h-12 text-deep-teal mx-auto mb-4 group-hover:scale-110 transition-transform" />
-            <h3 className="text-xl font-semibold text-text-primary mb-2">مقدم خدمة</h3>
-            <p className="text-text-secondary">ابحث عن مقدمي الخدمات والمحترفين في مختلف المجالات</p>
-          </button>
-          
-          <button
-            onClick={() => handleChoiceSelection('service-requests')}
-            className="group p-8 rounded-xl border-2 border-gray-200 hover:border-deep-teal transition-all duration-300 hover:shadow-lg hover:bg-soft-teal/5"
-          >
-            <FileText className="w-12 h-12 text-deep-teal mx-auto mb-4 group-hover:scale-110 transition-transform" />
-            <h3 className="text-xl font-semibold text-text-primary mb-2">طلبات الخدمات</h3>
-            <p className="text-text-secondary">تصفح طلبات الخدمات المتاحة وقدم عروضك</p>
-          </button>
+          {processedRequests.map((request) => (
+            <ServiceRequestCard
+              key={request.id}
+              request={request}
+              onInterested={handleApplyToRequest}
+              onViewDetails={handleViewRequest}
+              alreadyApplied={false}
+            />
+          ))}
         </div>
-      </BaseCard>
-    </div>
-  );
-
-  const getPageTitle = () => {
-    if (searchType === 'providers') return 'البحث عن مقدمي الخدمات';
-    if (searchType === 'service-requests') return 'البحث في طلبات الخدمات';
-    return 'البحث';
+      );
+    }
   };
 
-  const getPageSubtitle = () => {
-    if (searchType === 'providers') {
-      let text = `${resolvedProviders.length} مقدم خدمة`;
-      if (filters.category) text += ` في ${filters.category}`;
-      return text;
+  // Render smart default state
+  const renderSmartDefaultState = () => {
+    if (userIntent === 'need-service') {
+      return (
+        <div className="text-center py-16">
+          <Users className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+          <h2 className="text-2xl font-bold text-gray-700 mb-4">
+            استكشف المحترفين المتاحين
+          </h2>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            اختر فئة أو اكتب ما تحتاجه لرؤية المحترفين المتاحين في مجالك
+          </p>
+          
+          {/* Quick Actions */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              variant="primary"
+              onClick={() => navigate('/request-service')}
+            >
+              نشر طلب جديد
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/categories')}
+            >
+              تصفح الفئات
+            </Button>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div className="text-center py-16">
+          <FileText className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+          <h2 className="text-2xl font-bold text-gray-700 mb-4">
+            ابحث عن فرص العمل
+          </h2>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            اختر فئة أو اكتب ما تبحث عنه لرؤية طلبات الخدمات المتاحة
+          </p>
+        </div>
+      );
     }
-    if (searchType === 'service-requests') {
-      let text = `${mappedRequests.length} طلب خدمة`;
-      if (filters.category) text += ` في ${filters.category}`;
-      return text;
-    }
-    return 'اختر نوع البحث للبدء';
   };
-
-  if (!searchType) {
-    return (
-      <PageLayout
-        title={getPageTitle()}
-        subtitle={getPageSubtitle()}
-        breadcrumbItems={breadcrumbItems}
-        user={user}
-        onLogout={logout}
-      >
-        {renderChoiceScreen()}
-      </PageLayout>
-    );
-  }
-
-  // In the resolvedProviders rendering, mark the first 5 premium providers as featured
-  let featuredCount = 0;
-  const providersWithFeatured = resolvedProviders.map((provider, idx) => {
-    let featured = false;
-    if (provider.isPremium && featuredCount < 5) {
-      featured = true;
-      featuredCount++;
-    }
-    return { ...provider, featured };
-  });
 
   return (
     <PageLayout
-      title={getPageTitle()}
-      subtitle={getPageSubtitle()}
-      breadcrumbItems={breadcrumbItems}
-      onSearch={handleSearch}
-      searchValue={filters.search}
+      title="البحث"
+      subtitle={
+        userIntent === 'need-service' 
+          ? 'ابحث عن المحترف المناسب'
+          : 'ابحث عن فرص العمل'
+      }
       user={user}
-      onLogout={logout}
     >
-      <div className="mb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleBackToChoice}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          العودة للخيارات
-        </Button>
-      </div>
-      
-      <div className="flex flex-col lg:flex-row gap-8">
-        <div className="w-full lg:w-1/4 lg:sticky lg:top-4 lg:self-start">
-          <FilterForm
-            filters={filters}
-            onFiltersChange={handleFiltersChange}
-            onClearFilters={handleClearFilters}
-            onSearch={handleSearch}
-            variant="sidebar"
-            activeTab={searchType === 'providers' ? 'services' : 'requests'}
-          />
-        </div>
+      <div className="max-w-6xl mx-auto px-4">
+        {renderSearchInterface()}
         
-        <div className="w-full lg:w-3/4">
-          {/* Top Banner Ad */}
-          <div className="mb-6">
-            <AdPlacement location="search" type="top" />
-          </div>
-          
-          {/* Featured Providers Section - Only show for providers search */}
-          {searchType === 'providers' && (
-            <div className="mb-8">
-              <FeaturedProviders />
-            </div>
-          )}
-          
-          {/* Targeted Leads for Premium Providers */}
-          {/* Removed: عروض مستهدفة لك (مميز) section as per new requirements */}
-          {searchType === 'providers' ? (
-            listingsLoading ? (
-              <div className="text-center py-12 text-lg text-deep-teal">جاري تحميل مقدمي الخدمات...</div>
-            ) : listingsError ? (
-              <div className="text-center py-12 text-red-600">{listingsError.message}</div>
-            ) : providersWithFeatured.length > 0 ? (
-              <>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  {providersWithFeatured.map((provider, index) => (
-                    <React.Fragment key={provider.id}>
-                      <ServiceCard
-                        provider={provider}
-                        onViewDetails={() => handleViewProviderDetails(provider.providerId || provider.id)}
-                        featured={provider.featured}
-                      />
-                      {/* Interstitial Ad every 6 providers */}
-                      {(index + 1) % 6 === 0 && index < providersWithFeatured.length - 1 && (
-                        <div className="col-span-full my-6">
-                          <AdPlacement location="search" type="interstitial" />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </>
-            ) : (
-              renderEmptyState()
-            )
-          ) : (
-            requestsLoading ? (
-              <div className="text-center py-12 text-lg text-deep-teal">جاري تحميل طلبات الخدمات...</div>
-            ) : requestsError ? (
-              <div className="text-center py-12 text-red-600">{requestsError.message}</div>
-            ) : mappedRequests.length > 0 ? (
-              <>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  {mappedRequests.map((request, index) => (
-                    <React.Fragment key={request.id}>
-                      <ServiceRequestCard
-                        request={request}
-                        onInterested={handleInterestedInRequest}
-                        onViewDetails={handleViewRequestDetails}
-                        alreadyApplied={providerOfferRequestIds.includes(request.id)}
-                      />
-                      {/* Interstitial Ad every 6 requests */}
-                      {(index + 1) % 6 === 0 && index < mappedRequests.length - 1 && (
-                        <div className="col-span-full my-6">
-                          <AdPlacement location="search" type="interstitial" />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </>
-            ) : (
-              renderEmptyState()
-            )
-          )}
-          {/* Bottom Banner Ad */}
-          <div className="mt-8">
-            <AdPlacement location="search" type="bottom" />
-          </div>
-        </div>
+                 {/* Results Section */}
+         <div className="mb-8">
+           {/* Show results even without search - smart defaults */}
+           {((searchQuery || selectedCategory) || processedProviders.length > 0 || processedRequests.length > 0) ? (
+             <>
+               <div className="flex items-center justify-between mb-6">
+                 <h2 className="text-xl font-bold text-gray-800">
+                   {userIntent === 'need-service' 
+                     ? `المحترفين المتاحين (${processedProviders.length})`
+                     : `طلبات الخدمات (${processedRequests.length})`
+                   }
+                 </h2>
+                 {(searchQuery || selectedCategory) && (
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => {
+                       setSearchQuery('');
+                       setSelectedCategory('');
+                       navigate('/search', { replace: true });
+                     }}
+                   >
+                     مسح البحث
+                   </Button>
+                 )}
+               </div>
+               {renderResults()}
+             </>
+           ) : (
+             renderSmartDefaultState()
+           )}
+         </div>
       </div>
     </PageLayout>
   );

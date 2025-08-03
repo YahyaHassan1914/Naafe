@@ -59,8 +59,7 @@ const App = () => {
               <Route path="/ad-test" element={<AdSystemTest />} />
               <Route path="/categories" element={<ServiceCategoriesPage />} />
               <Route path="/search" element={<SearchPage />} />
-              <Route path="/search/providers" element={<SearchPage />} />
-              <Route path="/search/service-requests" element={<SearchPage />} />
+                      <Route path="/search" element={<SearchPage />} />
               <Route path="/provider/:id" element={<ProviderDetailsPage />} />
               <Route path="/hire-provider/:id" element={
                 <ProtectedRoute>

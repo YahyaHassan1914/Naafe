@@ -64,11 +64,11 @@ const ServiceCategoriesPage = () => {
   ];
 
   const handleCategoryClick = useCallback((category: Category) => {
-    navigate(`/search/providers?category=${encodeURIComponent(category.name)}`);
+          navigate(`/search?category=${encodeURIComponent(category.name)}&intent=need-service`);
   }, [navigate]);
 
   const handleSearch = useCallback((query: string) => {
-    navigate(`/search/providers?query=${encodeURIComponent(query)}`);
+          navigate(`/search?query=${encodeURIComponent(query)}&intent=need-service`);
   }, [navigate]);
 
   return (
