@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { MapPin, Star, CheckCircle } from 'lucide-react';
+import { Star, CheckCircle } from 'lucide-react';
 import BaseCard from './ui/BaseCard';
 import Button from './ui/Button';
-import PremiumBadge from './ui/PremiumBadge';
+
 import { translateCategory } from '../utils/helpers';
 import { ServiceProvider } from '../types';
 
@@ -60,10 +60,7 @@ const ServiceCard = ({ provider, onViewDetails, featured }: ServiceCardProps) =>
       <span className="absolute left-4 top-4 z-20 text-base font-bold bg-soft-teal/30 text-deep-teal px-4 py-1 rounded-lg whitespace-nowrap" style={{ fontSize: '1.1rem' }}>
         {translateCategory(provider.category)}
       </span>
-      {/* Premium Background Effect */}
-      {(provider.isPremium || featured) && (
-        <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/10 to-orange-400/10 pointer-events-none"></div>
-      )}
+
       <div className="relative z-10 p-5 flex flex-col h-full">
         {/* Header Section - Avatar and Name */}
         <div className="flex items-start gap-4 mb-2">
@@ -72,15 +69,9 @@ const ServiceCard = ({ provider, onViewDetails, featured }: ServiceCardProps) =>
             <img
               src={provider.imageUrl || '/default-avatar.png'}
               alt={`${provider.name} profile`}
-              className={`w-20 h-20 rounded-full object-cover border-2 ${
-                (provider.isPremium || featured) ? 'border-yellow-400' : 'border-gray-200'
-              }`}
+              className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
             />
-            {(provider.isPremium || featured) && (
-              <div className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2">
-                <PremiumBadge size="sm" />
-              </div>
-            )}
+
             {provider.isVerified && (
               <div className="absolute -top-1 right-1">
                 <CheckCircle className="w-6 h-6 text-green-500 bg-white rounded-full shadow-sm" />
@@ -94,13 +85,7 @@ const ServiceCard = ({ provider, onViewDetails, featured }: ServiceCardProps) =>
                 ? `${(provider.name as { first: string; last: string }).first} ${(provider.name as { first: string; last: string }).last}`
                 : provider.name}
             </h3>
-            {/* Address */}
-            <div className="flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4 text-text-secondary flex-shrink-0" />
-              <span className="text-base text-text-secondary truncate font-semibold">
-                {provider.location || 'غير محدد'}
-              </span>
-            </div>
+
             {/* Member Since */}
             {memberSinceText && (
               <div className="text-xs text-text-secondary mt-1">{memberSinceText}</div>

@@ -26,7 +26,7 @@ import AdminUpgradeRequests from './admin/pages/AdminUpgradeRequests';
 import AdminManageComplaints from './admin/pages/AdminManageComplaints';
 import HelpCenterPage from './pages/HelpCenterPage';
 import SettingsPage from './pages/SettingsPage';
-import PricingPage from './pages/PricingPage';
+
 import NotificationPage from './pages/NotificationPage';
 import ChatPage from './pages/ChatPage';
 import ConversationsPage from './pages/ConversationsPage';
@@ -118,7 +118,7 @@ const App = () => {
                 <Route path="/requests/:id" element={<RequestServiceDetailsPage />} />
                 <Route path="/requests/:id/respond" element={<ServiceResponseForm />} />
               <Route path="/help" element={<HelpCenterPage />} />
-              <Route path="/pricing" element={<PricingPage />} />
+      
               <Route path="/notifications" element={
                 <ProtectedRoute>
                   <NotificationPage />

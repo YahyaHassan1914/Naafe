@@ -23,7 +23,6 @@ export interface ServiceProvider {
   location: string;
   startingPrice: number;
   imageUrl: string;
-  isPremium: boolean;
   isTopRated: boolean;
   completedJobs: number;
   isVerified: boolean;
@@ -55,7 +54,6 @@ export interface ServiceRequest {
     id: string;
     name: string;
     avatar?: string;
-    isPremium: boolean;
     isVerified?: boolean;
   };
   createdAt: string;
@@ -81,7 +79,7 @@ export interface FilterState {
   rating: string;
   category?: string;
   tab?: 'services' | 'requests';
-  premiumOnly?: boolean;
+
   availability?: {
     days: string[];
     timeSlots: string[];
@@ -101,7 +99,6 @@ export interface User {
   email: string;
   avatar?: string;
   avatarUrl?: string;
-  isPremium?: boolean;
   isTopRated?: boolean;
   isVerified?: boolean;
   phone?: string;

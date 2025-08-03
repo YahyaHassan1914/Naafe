@@ -8,7 +8,7 @@ import BaseCard from '../components/ui/BaseCard';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import RatingDisplay from '../components/ui/RatingDisplay';
-import PremiumBadge from '../components/ui/PremiumBadge';
+
 import TopRatedBadge from '../components/ui/TopRatedBadge';
 import {
   Star,
@@ -207,9 +207,7 @@ const ProviderDetailsPage: React.FC = () => {
           
           {/* Provider Header */}
           <BaseCard className="mb-8 relative overflow-hidden">
-            {provider.isPremium && (
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/5 to-orange-400/5 pointer-events-none"></div>
-            )}
+
             
             <div className="relative z-10">
               <div className="flex flex-col lg:flex-row gap-6">
@@ -219,15 +217,9 @@ const ProviderDetailsPage: React.FC = () => {
                     <img
                       src={provider.avatarUrl || '/default-avatar.png'}
                       alt={getProviderName(provider)}
-                      className={`w-24 h-24 lg:w-32 lg:h-32 rounded-full object-cover border-4 ${
-                        provider.isPremium ? 'border-yellow-300' : 'border-gray-200'
-                      }`}
+                      className="w-24 h-24 lg:w-32 lg:h-32 rounded-full object-cover border-4 border-gray-200"
                     />
-                    {provider.isPremium && (
-                      <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                        <PremiumBadge size="md" />
-                      </div>
-                    )}
+
                   </div>
                   
                   <div className="flex flex-wrap gap-2 justify-center lg:justify-start">

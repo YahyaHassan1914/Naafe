@@ -1,10 +1,10 @@
 import React from 'react';
-import { MapPin, Clock, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
+import { Clock, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
 import BaseCard from './ui/BaseCard';
 import Button from './ui/Button';
-import PremiumBadge from './ui/PremiumBadge';
+
 import { ServiceRequest } from '../types';
-import { translateLocation, translateCategory } from '../utils/helpers';
+import { translateCategory } from '../utils/helpers';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Tippy from '@tippyjs/react';
@@ -98,18 +98,7 @@ const ServiceRequestCard = ({ request, alreadyApplied, onInterested, onViewDetai
   };
 
   return (
-    <BaseCard className={`
-      h-full flex flex-col hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1
-      relative
-      ${request.postedBy?.isPremium 
-        ? 'border-2 border-yellow-300 bg-gradient-to-br from-yellow-50 via-orange-50 to-yellow-100 shadow-xl hover:shadow-2xl overflow-hidden' 
-        : 'border border-gray-200 hover:border-soft-teal/30'
-      }
-    `}>
-      {/* Premium Background Effect */}
-      {request.postedBy?.isPremium && (
-        <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/10 to-orange-400/10 pointer-events-none"></div>
-      )}
+    <BaseCard className="h-full flex flex-col hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 relative border border-gray-200 hover:border-soft-teal/30">
       
       <div className="relative z-10 p-5 flex flex-col h-full">
         {/* Header Section - Avatar and Name */}
@@ -119,15 +108,9 @@ const ServiceRequestCard = ({ request, alreadyApplied, onInterested, onViewDetai
             <img
               src={request.postedBy?.avatar || '/default-avatar.png'}
               alt={request.postedBy?.name || 'User profile'}
-              className={`w-20 h-20 rounded-full object-cover border-2 ${
-                request.postedBy?.isPremium ? 'border-yellow-400' : 'border-gray-200'
-              }`}
+              className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
             />
-            {request.postedBy?.isPremium && (
-              <div className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2">
-                <PremiumBadge size="sm" />
-              </div>
-            )}
+
             {request.postedBy?.isVerified && (
               <div className="absolute -top-1 right-1">
                 <CheckCircle className="w-6 h-6 text-green-500 bg-white rounded-full shadow-sm" />
@@ -186,15 +169,7 @@ const ServiceRequestCard = ({ request, alreadyApplied, onInterested, onViewDetai
           </div>
         </div>
 
-        {/* Location - Fixed Height */}
-        {request.location && (
-          <div className="flex items-center gap-2 mb-3">
-            <MapPin className="w-4 h-4 text-text-secondary flex-shrink-0" />
-            <span className="text-sm text-text-secondary truncate">
-              {translateLocation(request.location) || 'عن بُعد'}
-            </span>
-          </div>
-        )}
+
 
         {/* Description - Flexible Height with Line Clamp */}
         <div className="flex-1 mb-4">

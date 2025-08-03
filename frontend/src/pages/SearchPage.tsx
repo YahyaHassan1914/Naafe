@@ -123,7 +123,7 @@ const SearchPage = () => {
     completionRate: 0,
     skills: listing.provider?.providerProfile?.skills || [],
     imageUrl: listing.provider?.avatarUrl || '',
-    isPremium: listing.provider?.isPremium || false,
+
     isTopRated: listing.provider?.isTopRated || false,
     isVerified: listing.provider?.isVerified || false,
     memberSince: listing.provider?.createdAt || '',
@@ -145,7 +145,7 @@ const SearchPage = () => {
         `${request.seeker.name.first || ''} ${request.seeker.name.last || ''}`.trim() : 
         'مستخدم',
       avatar: request.seeker?.avatarUrl || '',
-      isPremium: request.seeker?.isPremium || false,
+
     },
     timePosted: request.createdAt || new Date().toISOString(),
     createdAt: request.createdAt || new Date().toISOString(),
