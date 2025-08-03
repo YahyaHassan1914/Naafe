@@ -42,6 +42,8 @@ import NewChatPage from './pages/NewChatPage';
 import SchedulePage from './pages/SchedulePage';
 import RequestSuccessPage from './pages/RequestSuccessPage';
 import ProviderDashboardPage from './pages/ProviderDashboardPage';
+import ProviderProfilePage from './pages/ProviderProfilePage';
+import BookingSystem from './components/ui/BookingSystem';
 import { ResetPasswordHandler } from './components/ui/ResetPasswordHandler';
 
 const App = () => {
@@ -54,9 +56,10 @@ const App = () => {
           <div className="App">
             <Routes>
               <Route path="/" element={<LandingPage />} />
-              <Route path="/test" element={<TestPage />} />
-              <Route path="/minimal" element={<MinimalTest />} />
-              <Route path="/ad-test" element={<AdSystemTest />} />
+                             <Route path="/test" element={<TestPage />} />
+               <Route path="/minimal" element={<MinimalTest />} />
+               <Route path="/ad-test" element={<AdSystemTest />} />
+               
               <Route path="/categories" element={<ServiceCategoriesPage />} />
               <Route path="/search" element={<SearchPage />} />
                       <Route path="/search" element={<SearchPage />} />
@@ -76,11 +79,21 @@ const App = () => {
                   <SchedulePage />
                 </ProtectedRoute>
               } />
-              <Route path="/provider-dashboard" element={
-                <ProtectedRoute requiredRoles={['provider']}>
-                  <ProviderDashboardPage />
-                </ProtectedRoute>
-              } />
+                      <Route path="/provider-dashboard" element={
+          <ProtectedRoute requiredRoles={['provider']}>
+            <ProviderDashboardPage />
+          </ProtectedRoute>
+        } />
+                 <Route path="/provider-profile" element={
+           <ProtectedRoute requiredRoles={['provider']}>
+             <ProviderProfilePage />
+           </ProtectedRoute>
+         } />
+         <Route path="/booking/:providerId" element={
+           <ProtectedRoute requiredRoles={['seeker']}>
+             <BookingSystem />
+           </ProtectedRoute>
+         } />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/reset-password" element={<ResetPasswordHandler />} />

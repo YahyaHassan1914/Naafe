@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Calendar, DollarSign, MessageCircle } from 'lucide-react';
+import { Eye, Calendar, DollarSign, MessageCircle, Clock } from 'lucide-react';
 import CardContainer from './CardContainer';
 import CardHeader from './CardHeader';
 import CardMetrics from './CardMetrics';
@@ -26,7 +26,56 @@ const RequestCard: React.FC<RequestCardProps> = ({
   error = false,
   className
 }) => {
-  // Prepare metrics
+  // Format time posted
+  const formatTimePosted = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+      
+      if (diffInHours < 1) return 'منذ دقائق';
+      if (diffInHours < 24) return `منذ ${diffInHours} ساعة`;
+      if (diffInHours < 48) return 'منذ يوم';
+      return `منذ ${Math.floor(diffInHours / 24)} يوم`;
+    } catch {
+      return 'منذ فترة';
+    }
+  };
+
+  // Format budget
+  const formatBudget = () => {
+    const { budget } = request;
+    if (!budget) return 'سعر متغير';
+    
+    const { min = 0, max = 0 } = budget;
+    if (min && max && min !== max) {
+      return `${min} - ${max} جنيه`;
+    } else if (min) {
+      return `${min} جنيه`;
+    }
+    return 'سعر متغير';
+  };
+
+  // Format deadline
+  const formatDeadline = () => {
+    if (!request.deadline) return 'لا يوجد موعد محدد';
+    
+    try {
+      const deadline = new Date(request.deadline);
+      const now = new Date();
+      const diffInDays = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffInDays < 0) return 'منتهي';
+      if (diffInDays === 0) return 'اليوم';
+      if (diffInDays === 1) return 'غداً';
+      if (diffInDays <= 7) return `خلال ${diffInDays} أيام`;
+      return deadline.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
+    } catch {
+      return 'موعد محدد';
+    }
+  };
+
+  // Prepare metrics - Only show essential info
   const metrics = [
     {
       label: 'عرض',
@@ -35,14 +84,8 @@ const RequestCard: React.FC<RequestCardProps> = ({
       icon: <MessageCircle className="w-3 h-3" />
     },
     {
-      label: 'جنيه',
-      value: request.budget?.min || 0,
-      color: 'success' as const,
-      icon: <DollarSign className="w-3 h-3" />
-    },
-    {
       label: 'موعد',
-      value: request.deadline ? 'محدد' : 'مفتوح',
+      value: formatDeadline(),
       color: 'secondary' as const,
       icon: <Calendar className="w-3 h-3" />
     }
@@ -93,19 +136,41 @@ const RequestCard: React.FC<RequestCardProps> = ({
         isVerified={request.postedBy?.isVerified}
       />
 
-      <CardMetrics
-        metrics={metrics}
-        layout="grid-3"
-      />
+      {/* Essential Info Section */}
+      <div className="mb-3">
+        {/* Urgency and Time Posted */}
+        <div className="flex items-center gap-2 mb-2">
+          {request.urgency && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              request.urgency === 'high' ? 'text-red-600 bg-red-100' :
+              request.urgency === 'medium' ? 'text-orange-600 bg-orange-100' :
+              'text-green-600 bg-green-100'
+            }`}>
+              {request.urgency === 'high' ? 'عاجل' : request.urgency === 'medium' ? 'متوسط' : 'عادي'}
+            </span>
+          )}
+          <span className="text-xs text-gray-500">
+            {formatTimePosted(request.timePosted || request.createdAt)}
+          </span>
+        </div>
 
-      <CardContent
-        title={request.title}
-        description={request.description}
-        budget={request.budget}
-        urgency={request.urgency}
-        deadline={request.deadline}
-        availability={request.availability}
-      />
+        {/* Description */}
+        {request.description && (
+          <p className="text-sm text-gray-600 mb-2 line-clamp-2 leading-relaxed">
+            {request.description}
+          </p>
+        )}
+
+        {/* Budget and Location */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm">
+            <DollarSign className="w-4 h-4 text-green-600" />
+            <span className="font-semibold text-green-600">{formatBudget()}</span>
+          </div>
+          
+
+        </div>
+      </div>
 
       <CardActions
         actions={actions}

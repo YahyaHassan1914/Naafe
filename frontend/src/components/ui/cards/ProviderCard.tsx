@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star, Eye, MessageCircle } from 'lucide-react';
+import { Star, Eye, MessageCircle, Clock, DollarSign, Calendar } from 'lucide-react';
 import CardContainer from './CardContainer';
 import CardHeader from './CardHeader';
 import CardMetrics from './CardMetrics';
@@ -12,6 +12,7 @@ interface ProviderCardProps {
   onViewDetails: (providerId: string) => void;
   onContact?: (providerId: string) => void;
   onHire?: (providerId: string) => void;
+  onCheckAvailability?: (providerId: string) => void;
   loading?: boolean;
   error?: boolean;
   className?: string;
@@ -22,6 +23,7 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
   onViewDetails,
   onContact,
   onHire,
+  onCheckAvailability,
   loading = false,
   error = false,
   className
@@ -34,18 +36,44 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
     return name;
   };
 
-  // Prepare metrics
+  // Format pricing
+  const formatPricing = () => {
+    const { budgetMin = 0, budgetMax = 0 } = provider;
+    if (budgetMin && budgetMax && budgetMin !== budgetMax) {
+      return `${budgetMin} - ${budgetMax} جنيه`;
+    } else if (budgetMin) {
+      return `${budgetMin} جنيه`;
+    }
+    return 'سعر متغير';
+  };
+
+  // Format availability
+  const formatAvailability = () => {
+    if (!provider.availability?.days?.length) return 'متاح حسب الطلب';
+    
+    const dayNames: Record<string, string> = {
+      sunday: 'الأحد',
+      monday: 'الاثنين',
+      tuesday: 'الثلاثاء',
+      wednesday: 'الأربعاء',
+      thursday: 'الخميس',
+      friday: 'الجمعة',
+      saturday: 'السبت'
+    };
+
+    const formattedDays = provider.availability.days
+      .map(day => dayNames[day] || day)
+      .slice(0, 3); // Show max 3 days
+
+    return `متاح: ${formattedDays.join('، ')}`;
+  };
+
+  // Prepare metrics - Only show essential info
   const metrics = [
     {
-      label: 'مهمة',
-      value: provider.completedJobs || 0,
-      color: 'primary' as const,
-      icon: <Star className="w-3 h-3" />
-    },
-    {
       label: 'تقييم',
-      value: provider.rating || 0,
-      color: 'warning' as const,
+      value: provider.rating ? `${provider.rating.toFixed(1)} (${provider.completedJobs || 0} مهمة)` : 'جديد',
+      color: 'primary' as const,
       icon: <Star className="w-3 h-3" />
     }
   ];
@@ -70,13 +98,13 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
     });
   }
 
-  // Add hire action if available
-  if (onHire) {
+  // Add check availability action if available
+  if (onCheckAvailability) {
     actions.push({
-      label: 'استأجر',
-      variant: 'primary' as const,
-      onClick: () => onHire(provider.id),
-      icon: <Star className="w-4 h-4" />
+      label: 'تحقق من التوفر',
+      variant: 'outline' as const,
+      onClick: () => onCheckAvailability(provider.id),
+      icon: <Calendar className="w-4 h-4" />
     });
   }
 
@@ -93,27 +121,31 @@ const ProviderCard: React.FC<ProviderCardProps> = ({
         name={formatName(provider.name)}
         category={provider.category}
         isVerified={provider.isVerified}
-        isTopRated={provider.isTopRated}
         rating={provider.rating}
-        memberSince={provider.memberSince}
       />
 
-      <CardMetrics
-        metrics={metrics}
-        layout="grid-2"
-      />
+      {/* Essential Info Section */}
+      <div className="mb-3">
+        {/* Description */}
+        {provider.description && (
+          <p className="text-sm text-gray-600 mb-2 line-clamp-2 leading-relaxed">
+            {provider.description}
+          </p>
+        )}
 
-      <CardContent
-        title={provider.title}
-        description={provider.description}
-        skills={provider.skills}
-        availability={provider.availability}
-        budget={{
-          min: provider.budgetMin,
-          max: provider.budgetMax,
-          currency: 'EGP'
-        }}
-      />
+        {/* Pricing and Availability */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm">
+            <DollarSign className="w-4 h-4 text-green-600" />
+            <span className="font-semibold text-green-600">{formatPricing()}</span>
+          </div>
+          
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Clock className="w-4 h-4" />
+            <span>{formatAvailability()}</span>
+          </div>
+        </div>
+      </div>
 
       <CardActions
         actions={actions}

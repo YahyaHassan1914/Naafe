@@ -4,6 +4,7 @@ import { authenticateToken, requireRole } from '../middlewares/auth.middleware.j
 import Offer from '../models/Offer.js';
 import JobRequest from '../models/JobRequest.js';
 import User from '../models/User.js';
+import ServiceListing from '../models/ServiceListing.js';
 
 /**
  * @route   GET /api/providers/dashboard-stats
@@ -122,6 +123,121 @@ router.get('/recent-requests',
         error: {
           message: 'Failed to fetch recent requests'
         }
+      });
+    }
+  }
+);
+
+/**
+ * @route   GET /api/providers/profile
+ * @desc    Get provider's service profile
+ * @access  Private (Providers only)
+ * @returns {object} Provider's service profile data
+ */
+router.get('/profile',
+  authenticateToken,
+  requireRole(['provider']),
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // Get provider's service listing
+      const serviceListing = await ServiceListing.findOne({
+        provider: userId
+      }).lean();
+      
+      if (!serviceListing) {
+        return res.json({
+          success: true,
+          data: {
+            category: '',
+            subcategory: '',
+            description: '',
+            budgetMin: 0,
+            budgetMax: 0,
+            availability: {
+              days: [],
+              timeSlots: []
+            },
+            skills: []
+          }
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          category: serviceListing.category || '',
+          subcategory: serviceListing.subcategory || '',
+          description: serviceListing.description || '',
+          budgetMin: serviceListing.budget?.min || 0,
+          budgetMax: serviceListing.budget?.max || 0,
+          availability: serviceListing.availability || {
+            days: [],
+            timeSlots: []
+          },
+          skills: serviceListing.provider?.providerProfile?.skills || []
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching provider profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: 'فشل في تحميل الملف الشخصي' }
+      });
+    }
+  }
+);
+
+/**
+ * @route   PUT /api/providers/profile
+ * @desc    Update provider's service profile
+ * @access  Private (Providers only)
+ * @body    {object} Profile data
+ * @returns {object} Updated profile data
+ */
+router.put('/profile',
+  authenticateToken,
+  requireRole(['provider']),
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const profileData = req.body;
+      
+      // Update or create service listing
+      const serviceListing = await ServiceListing.findOneAndUpdate(
+        { provider: userId },
+        {
+          provider: userId,
+          category: profileData.category,
+          subcategory: profileData.subcategory,
+          title: `${profileData.category} - ${profileData.subcategory}`,
+          description: profileData.description,
+          budget: {
+            min: profileData.budgetMin,
+            max: profileData.budgetMax
+          },
+          availability: profileData.availability,
+          isActive: true
+        },
+        { upsert: true, new: true }
+      );
+      
+      // Update user's provider profile skills
+      await User.findByIdAndUpdate(userId, {
+        'providerProfile.skills': [profileData.category]
+      });
+      
+      res.json({
+        success: true,
+        data: serviceListing,
+        message: 'تم حفظ الملف الشخصي بنجاح'
+      });
+    } catch (error) {
+      console.error('Error updating provider profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: 'فشل في حفظ الملف الشخصي' }
       });
     }
   }

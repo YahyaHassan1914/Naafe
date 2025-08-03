@@ -186,6 +186,10 @@ const SearchPage = () => {
     navigate(`/provider/${providerId}`);
   };
 
+  const handleCheckAvailability = (providerId: string) => {
+    navigate(`/booking/${providerId}`);
+  };
+
   // Handle request selection
   const handleViewRequest = (requestId: string) => {
     navigate(`/requests/${requestId}`);
@@ -306,11 +310,12 @@ const SearchPage = () => {
              return (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            {processedProviders.map((provider) => (
-             <ProviderCard
-               key={provider.id}
-               provider={provider}
-               onViewDetails={() => handleViewProvider(provider.providerId || provider.id)}
-             />
+                           <ProviderCard
+                key={provider.id}
+                provider={provider}
+                onViewDetails={() => handleViewProvider(provider.providerId || provider.id)}
+                onCheckAvailability={() => handleCheckAvailability(provider.providerId || provider.id)}
+              />
            ))}
          </div>
        );

@@ -144,13 +144,18 @@ const ProviderDetailsPage: React.FC = () => {
     return `${provider.name?.first || ''} ${provider.name?.last || ''}`.trim() || 'مقدم خدمة';
   };
 
+  const handleBookAppointment = () => {
+    // Navigate to booking system with provider info
+    navigate(`/booking/${id}`);
+  };
+
   const handleContactProvider = () => {
     if (!user) {
       navigate('/login');
       return;
     }
-    // Navigate to chat or contact form
-    navigate(`/chat/new?userId=${id}`);
+    // Navigate to chat with provider
+    navigate(`/chat/new?provider=${id}`);
   };
 
   const handleHireProvider = () => {
@@ -346,6 +351,14 @@ const ProviderDetailsPage: React.FC = () => {
                       >
                         <MessageSquare className="w-4 h-4" />
                         تواصل معي
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleBookAppointment}
+                        className="flex items-center gap-2"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        حجز موعد
                       </Button>
                     </div>
                   </div>

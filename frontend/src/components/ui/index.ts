@@ -39,6 +39,8 @@ export { default as BudgetExplanationTextarea } from './BudgetExplanationTextare
 // Schedule Components
 export { default as ScheduleCalendar } from './ScheduleCalendar';
 export { default as ScheduleModal } from './ScheduleModal';
+export { default as SmartCalendar } from './SmartCalendar';
+export { default as BookingSystem } from './BookingSystem';
 
 // Authentication Components
 export { ForgotPasswordModal } from './ForgotPasswordModal';

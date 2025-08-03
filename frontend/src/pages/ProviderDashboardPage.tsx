@@ -10,11 +10,13 @@ import {
   Star,
   ArrowRight,
   Plus,
-  Eye
+  Eye,
+  Calendar
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import BaseCard from '../components/ui/BaseCard';
 import PageLayout from '../components/layout/PageLayout';
+import SmartCalendar from '../components/ui/SmartCalendar';
 
 interface DashboardStats {
   totalEarnings: number;
@@ -194,10 +196,10 @@ const ProviderDashboardPage: React.FC = () => {
               <Button
                 variant="outline"
                 leftIcon={<Users className="w-4 h-4" />}
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate('/provider-profile')}
                 className="min-w-fit"
               >
-                بياناتي
+                إدارة الملف الشخصي
               </Button>
             </div>
           </BaseCard>
@@ -269,22 +271,40 @@ const ProviderDashboardPage: React.FC = () => {
             )}
           </BaseCard>
 
+          {/* My Schedule */}
+          <BaseCard>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-deep-teal">جدولي</h2>
+              <Button
+                variant="outline"
+                leftIcon={<Calendar className="w-4 h-4" />}
+                onClick={() => navigate('/schedule')}
+              >
+                إدارة الجدول
+              </Button>
+            </div>
+            <SmartCalendar
+              mode="provider"
+              className="mb-4"
+            />
+          </BaseCard>
+
           {/* Performance Tips */}
           <BaseCard className="mt-8 bg-blue-50 border-blue-200">
-                         <h3 className="text-lg font-semibold text-deep-teal mb-3">نصائح مهمة</h3>
+            <h3 className="text-lg font-semibold text-deep-teal mb-3">نصائح مهمة</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="flex items-start gap-2">
                 <TrendingUp className="w-4 h-4 text-blue-500 mt-0.5" />
                 <div>
                   <p className="font-medium text-deep-teal">رد سريع</p>
-                                     <p className="text-gray-600">الرد السريع يزيد فرصك في العمل</p>
+                  <p className="text-gray-600">الرد السريع يزيد فرصك في العمل</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <Star className="w-4 h-4 text-yellow-500 mt-0.5" />
                 <div>
                   <p className="font-medium text-deep-teal">تقييمات عالية</p>
-                                     <p className="text-gray-600">التقييمات العالية تجلب لك عمل أكتر</p>
+                  <p className="text-gray-600">التقييمات العالية تجلب لك عمل أكتر</p>
                 </div>
               </div>
             </div>
