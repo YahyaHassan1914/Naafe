@@ -1,16 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Settings, HelpCircle, LogOut, ChevronDown, CreditCard, Megaphone } from 'lucide-react';
-import { User as UserType } from '../../types';
-import { cn } from '../../utils/helpers';
+import { User } from '../../types';
 
 interface UserDropdownProps {
-  user: UserType;
-  onLogout: () => Promise<void>;
-  className?: string;
+  user: User | null;
+  onLogout: () => void;
 }
 
-const UserDropdown = ({ user, onLogout, className = '' }: UserDropdownProps) => {
+const UserDropdown: React.FC<UserDropdownProps> = ({ user, onLogout }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -22,192 +19,179 @@ const UserDropdown = ({ user, onLogout, className = '' }: UserDropdownProps) => 
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
 
-  // Close dropdown on escape key
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
     };
+  }, [isOpen]);
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, []);
+  const handleToggle = () => {
+    setIsOpen(!isOpen);
+  };
 
-  const handleLogout = async () => {
-    await onLogout();
+  const handleLogout = () => {
     setIsOpen(false);
+    onLogout();
   };
 
-  const getUserInitials = (name: string | { first?: string; last?: string }) => {
-    if (typeof name === 'string') {
-      return name
-        .split(' ')
-        .map(word => word.charAt(0))
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
-    }
-    if (typeof name === 'object' && name) {
-      return `${name.first?.charAt(0) || ''}${name.last?.charAt(0) || ''}`.toUpperCase();
-    }
-    return '';
+  const getRoleName = (role: string) => {
+    const roleNames = {
+      seeker: 'مستفيد',
+      provider: 'مزود خدمة',
+      admin: 'مدير'
+    };
+    return roleNames[role as keyof typeof roleNames] || role;
   };
 
-  const getUserFullName = (name: string | { first?: string; last?: string }) => {
-    if (typeof name === 'string') return name;
-    if (typeof name === 'object' && name) {
-      return `${name.first || ''} ${name.last || ''}`.trim();
-    }
-    return '';
+  const getRoleColor = (role: string) => {
+    const roleColors = {
+      seeker: 'text-blue-600 bg-blue-50',
+      provider: 'text-green-600 bg-green-50',
+      admin: 'text-purple-600 bg-purple-50'
+    };
+    return roleColors[role as keyof typeof roleColors] || 'text-gray-600 bg-gray-50';
   };
 
-  const menuItems = [
-    {
-      icon: User,
-      label: 'الملف الشخصي',
-      href: '/profile',
-      onClick: () => setIsOpen(false)
-    },
-    {
-      icon: Settings,
-      label: 'الإعدادات',
-      href: '/settings',
-      onClick: () => setIsOpen(false)
-    },
-    {
-      icon: HelpCircle,
-      label: 'مركز المساعدة',
-      href: '/help',
-      onClick: () => setIsOpen(false)
-    },
-    // New Transactions menu item
-    {
-      icon: CreditCard,
-      label: 'معاملاتي',
-      href: '/transactions',
-      onClick: () => setIsOpen(false)
-    },
-    // Ad Management menu item
-    {
-      icon: Megaphone,
-      label: 'إدارة الإعلانات',
-      href: '/ads',
-      onClick: () => setIsOpen(false)
-    },
-    {
-      icon: LogOut,
-      label: 'تسجيل الخروج',
-      href: '#',
-      onClick: handleLogout,
-      className: 'text-red-600 hover:text-red-700 hover:bg-red-50'
-    }
-  ];
-
-  // Add Admin Dashboard link if user is admin
-  if (user.roles.includes('admin')) {
-    menuItems.unshift({
-      icon: User,
-      label: 'لوحة تحكم المشرف',
-      href: '/admin',
-      onClick: () => setIsOpen(false),
-    });
-  }
+  if (!user) return null;
 
   return (
-    <div className={cn('relative', className)} ref={dropdownRef}>
+    <div className="relative" ref={dropdownRef}>
+      {/* User Avatar Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 p-2 rounded-full hover:bg-bright-orange/10 transition-colors focus:outline-none focus:ring-2 focus:ring-deep-teal/50"
-        aria-expanded={isOpen ? 'true' : 'false'}
+        onClick={handleToggle}
+        className="flex items-center space-x-3 space-x-reverse p-2 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-deep-teal focus:ring-offset-2"
+        aria-label="User menu"
+        aria-expanded={isOpen}
         aria-haspopup="true"
-        aria-label="قائمة المستخدم"
       >
-        <div className="w-8 h-8 rounded-full overflow-hidden bg-deep-teal flex items-center justify-center">
-          {user.avatarUrl ? (
-            <img 
-              src={user.avatarUrl} 
-              alt={`${getUserFullName(user.name)} profile`}
-              className="w-full h-full object-cover"
-            />
-          ) : user.avatar ? (
-            <img 
-              src={user.avatar} 
-              alt={`${getUserFullName(user.name)} profile`}
-              className="w-full h-full object-cover"
+        {/* Avatar */}
+        <div className="w-8 h-8 bg-deep-teal text-white rounded-full flex items-center justify-center font-semibold text-sm">
+          {user.avatar ? (
+            <img
+              src={user.avatar}
+              alt={`${user.firstName} ${user.lastName}`}
+              className="w-full h-full rounded-full object-cover"
             />
           ) : (
-            <span className="text-white text-sm font-medium">
-              {getUserInitials(user.name)}
-            </span>
+            user.firstName?.charAt(0) || 'U'
           )}
         </div>
-        <ChevronDown 
-          className={cn(
-            'h-4 w-4 text-text-secondary transition-transform duration-200',
-            isOpen && 'rotate-180'
-          )} 
-        />
+
+        {/* User Info (hidden on mobile) */}
+        <div className="hidden sm:block text-right">
+          <div className="text-sm font-medium text-text-primary">
+            {user.firstName} {user.lastName}
+          </div>
+          <div className="text-xs text-text-secondary">
+            {getRoleName(user.role)}
+          </div>
+        </div>
+
+        {/* Dropdown Arrow */}
+        <svg
+          className={`w-4 h-4 text-text-secondary transition-transform ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 9l-7 7-7-7"
+          />
+        </svg>
       </button>
 
+      {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
           {/* User Info Header */}
           <div className="px-4 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-deep-teal flex items-center justify-center">
-                {user.avatarUrl ? (
-                  <img 
-                    src={user.avatarUrl} 
-                    alt={`${getUserFullName(user.name)} profile`}
-                    className="w-full h-full object-cover"
-                  />
-                ) : user.avatar ? (
-                  <img 
-                    src={user.avatar} 
-                    alt={`${getUserFullName(user.name)} profile`}
-                    className="w-full h-full object-cover"
+            <div className="flex items-center space-x-3 space-x-reverse">
+              <div className="w-10 h-10 bg-deep-teal text-white rounded-full flex items-center justify-center font-semibold">
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
-                  <span className="text-white text-sm font-medium">
-                    {getUserInitials(user.name)}
-                  </span>
+                  user.firstName?.charAt(0) || 'U'
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">
-                  {getUserFullName(user.name)}
-                </p>
-                <p className="text-xs text-text-secondary truncate">
+                <div className="text-sm font-medium text-text-primary truncate">
+                  {user.firstName} {user.lastName}
+                </div>
+                <div className="text-xs text-text-secondary truncate">
                   {user.email}
-                </p>
+                </div>
+                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${getRoleColor(user.role)}`}>
+                  {getRoleName(user.role)}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Menu Items */}
           <div className="py-1">
-            {menuItems.map((item, index) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={index}
-                  to={item.href}
-                  onClick={item.onClick}
-                  className={cn(
-                    'flex items-center gap-3 px-4 py-2 text-sm text-text-primary hover:text-deep-teal hover:bg-bright-orange/5 transition-colors',
-                    item.className
-                  )}
-                >
-                  <Icon className="h-4 w-4 text-deep-teal" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
+            <Link
+              to="/profile"
+              className="flex items-center space-x-3 space-x-reverse px-4 py-2 text-sm text-text-secondary hover:text-deep-teal hover:bg-gray-50 transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>👤</span>
+              <span>الملف الشخصي</span>
+            </Link>
+
+            <Link
+              to="/settings"
+              className="flex items-center space-x-3 space-x-reverse px-4 py-2 text-sm text-text-secondary hover:text-deep-teal hover:bg-gray-50 transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>⚙️</span>
+              <span>الإعدادات</span>
+            </Link>
+
+            {user.role === 'provider' && (
+              <Link
+                to="/verification"
+                className="flex items-center space-x-3 space-x-reverse px-4 py-2 text-sm text-text-secondary hover:text-deep-teal hover:bg-gray-50 transition-colors"
+                onClick={() => setIsOpen(false)}
+              >
+                <span>✅</span>
+                <span>التحقق من الحساب</span>
+              </Link>
+            )}
+
+            <Link
+              to="/help"
+              className="flex items-center space-x-3 space-x-reverse px-4 py-2 text-sm text-text-secondary hover:text-deep-teal hover:bg-gray-50 transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>❓</span>
+              <span>المساعدة</span>
+            </Link>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-100 my-1" />
+
+          {/* Logout */}
+          <div className="py-1">
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-3 space-x-reverse px-4 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors w-full text-right"
+            >
+              <span>🚪</span>
+              <span>تسجيل الخروج</span>
+            </button>
           </div>
         </div>
       )}
