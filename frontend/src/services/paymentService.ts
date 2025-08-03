@@ -1,183 +1,241 @@
-// We don't need to load Stripe.js for hosted checkout
-// The hosted checkout page handles everything
+import { api, ApiResponse, PaginatedResponse } from './api';
 
-export interface CreateCheckoutSessionRequest {
-  conversationId: string;
+// Types for payment data
+export interface Payment {
+  _id: string;
+  requestId: string;
+  offerId: string;
+  seekerId: {
+    _id: string;
+    name: {
+      first: string;
+      last: string;
+    };
+    email: string;
+  };
+  providerId: {
+    _id: string;
+    name: {
+      first: string;
+      last: string;
+    };
+    email: string;
+  };
   amount: number;
-  serviceTitle: string;
-  providerId: string;
+  platformFee: number;
+  providerAmount: number;
+  paymentMethod: 'stripe' | 'cod' | 'bank_transfer' | 'cash' | 'vodafone_cash' | 'meeza' | 'fawry';
+  paymentGateway: 'stripe' | 'manual';
+  status: 'pending' | 'agreed' | 'completed' | 'disputed' | 'refunded';
+  transactionId?: string;
+  paymentDate?: string;
+  verificationDate?: string;
+  verifiedBy?: string;
+  refundRequest?: {
+    reason: string;
+    amount: number;
+    requestedAt: string;
+    status: 'pending' | 'approved' | 'rejected';
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface CreateEscrowPaymentRequest {
+export interface CreatePaymentRequest {
+  requestId: string;
   offerId: string;
   amount: number;
+  paymentMethod: Payment['paymentMethod'];
 }
 
-export interface CreateCheckoutSessionResponse {
-  success: boolean;
-  data: {
-    sessionId: string;
-    url: string;
-  };
-  message?: string;
+export interface UpdatePaymentStatusRequest {
+  status: Payment['status'];
+  verificationNotes?: string;
 }
 
-export const createCheckoutSession = async (
-  data: CreateCheckoutSessionRequest,
-  accessToken: string
-): Promise<CreateCheckoutSessionResponse> => {
-  try {
-    console.log('Making payment request to:', '/api/payment/create-checkout-session');
-    console.log('Request data:', data);
-    
-    const response = await fetch('/api/payment/create-checkout-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(data),
-    });
+export interface RefundRequest {
+  reason: string;
+  amount?: number;
+}
 
-    console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
+export interface PaymentFilters {
+  status?: Payment['status'];
+  paymentMethod?: Payment['paymentMethod'];
+  page?: number;
+  limit?: number;
+}
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Response error:', errorText);
-      return {
-        success: false,
-        data: { sessionId: '', url: '' },
-        message: `HTTP ${response.status}: ${errorText}`
-      };
-    }
+// Payment service functions
+export const paymentService = {
+  /**
+   * Create a new payment
+   */
+  async createPayment(data: CreatePaymentRequest): Promise<ApiResponse<Payment>> {
+    return api.payments.create(data);
+  },
 
-    const result = await response.json();
-    console.log('Response result:', result);
-    return result;
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    return {
-      success: false,
-      data: { sessionId: '', url: '' },
-      message: 'حدث خطأ أثناء إنشاء جلسة الدفع'
-    };
-  }
-};
+  /**
+   * Get payment details by ID
+   */
+  async getPaymentById(paymentId: string): Promise<ApiResponse<Payment>> {
+    return api.payments.getById(paymentId);
+  },
 
-// New function for escrow payment
-export const createEscrowPayment = async (
-  data: CreateEscrowPaymentRequest,
-  accessToken: string
-): Promise<CreateCheckoutSessionResponse> => {
-  try {
-    console.log('Making escrow payment request for offer:', data.offerId);
-    
-    const response = await fetch('/api/payment/create-escrow-payment', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(data),
-    });
+  /**
+   * Update payment status (admin only)
+   */
+  async updatePaymentStatus(
+    paymentId: string, 
+    data: UpdatePaymentStatusRequest
+  ): Promise<ApiResponse<Payment>> {
+    return api.payments.updateStatus(paymentId, data);
+  },
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Escrow payment error:', errorText);
-      return {
-        success: false,
-        data: { sessionId: '', url: '' },
-        message: `HTTP ${response.status}: ${errorText}`
-      };
-    }
+  /**
+   * Request a refund
+   */
+  async requestRefund(
+    paymentId: string, 
+    data: RefundRequest
+  ): Promise<ApiResponse<Payment>> {
+    return api.payments.requestRefund(paymentId, data);
+  },
 
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('Error creating escrow payment:', error);
-    return {
-      success: false,
-      data: { sessionId: '', url: '' },
-      message: 'حدث خطأ أثناء إنشاء الدفع للضمان'
-    };
-  }
-};
+  /**
+   * Get user's transaction history
+   */
+  async getMyTransactions(
+    filters?: PaymentFilters
+  ): Promise<ApiResponse<PaginatedResponse<Payment>>> {
+    return api.payments.getMyTransactions(filters);
+  },
 
-// Release funds from escrow after service completion
-export const releaseFundsFromEscrow = async (
-  paymentId: string,
-  accessToken: string
-): Promise<{ success: boolean; message?: string }> => {
-  try {
-    const response = await fetch(`/api/payment/release-funds/${paymentId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
+  /**
+   * Process Stripe payment (if using Stripe)
+   */
+  async processStripePayment(
+    paymentIntentId: string,
+    paymentData: CreatePaymentRequest
+  ): Promise<ApiResponse<Payment>> {
+    // This would integrate with Stripe's payment intent confirmation
+    // For now, we'll create the payment record and let the webhook handle the status update
+    return this.createPayment(paymentData);
+  },
+
+  /**
+   * Get payment statistics for a user
+   */
+  async getPaymentStats(userId: string): Promise<{
+    totalPayments: number;
+    totalAmount: number;
+    completedPayments: number;
+    pendingPayments: number;
+    averageAmount: number;
+  }> {
+    try {
+      const response = await api.payments.getMyTransactions({ limit: 1000 });
+      
+      if (!response.success || !response.data) {
+        throw new Error('Failed to fetch payment data');
       }
-    });
 
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('Error releasing funds from escrow:', error);
-    return {
-      success: false,
-      message: 'حدث خطأ أثناء تحرير الأموال من الضمان'
+      const payments = response.data.data;
+      
+      const stats = {
+        totalPayments: payments.length,
+        totalAmount: payments.reduce((sum, payment) => sum + payment.amount, 0),
+        completedPayments: payments.filter(p => p.status === 'completed').length,
+        pendingPayments: payments.filter(p => p.status === 'pending').length,
+        averageAmount: payments.length > 0 
+          ? payments.reduce((sum, payment) => sum + payment.amount, 0) / payments.length 
+          : 0
+      };
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting payment stats:', error);
+      return {
+        totalPayments: 0,
+        totalAmount: 0,
+        completedPayments: 0,
+        pendingPayments: 0,
+        averageAmount: 0
+      };
+    }
+  },
+
+  /**
+   * Format payment amount for display
+   */
+  formatAmount(amount: number): string {
+    return new Intl.NumberFormat('ar-EG', {
+      style: 'currency',
+      currency: 'EGP'
+    }).format(amount);
+  },
+
+  /**
+   * Get payment method display name
+   */
+  getPaymentMethodName(method: Payment['paymentMethod']): string {
+    const methodNames: Record<Payment['paymentMethod'], string> = {
+      stripe: 'بطاقة ائتمان',
+      cod: 'الدفع عند الاستلام',
+      bank_transfer: 'تحويل بنكي',
+      cash: 'نقداً',
+      vodafone_cash: 'فودافون كاش',
+      meeza: 'ميزة',
+      fawry: 'فوري'
     };
-  }
-};
+    return methodNames[method] || method;
+  },
 
-// Request service cancellation
-export const requestCancellation = async (
-  offerId: string,
-  reason: string,
-  accessToken: string
-): Promise<{ success: boolean; message?: string; refundPercentage?: number }> => {
-  try {
-    const response = await fetch(`/api/payment/cancel-service/${offerId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ reason })
-    });
-
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('Error requesting cancellation:', error);
-    return {
-      success: false,
-      message: 'حدث خطأ أثناء طلب إلغاء الخدمة'
+  /**
+   * Get payment status display name
+   */
+  getPaymentStatusName(status: Payment['status']): string {
+    const statusNames: Record<Payment['status'], string> = {
+      pending: 'في الانتظار',
+      agreed: 'تم الاتفاق',
+      completed: 'مكتمل',
+      disputed: 'متنازع عليه',
+      refunded: 'مسترد'
     };
-  }
+    return statusNames[status] || status;
+  },
+
+  /**
+   * Check if payment can be refunded
+   */
+  canRefund(payment: Payment): boolean {
+    return payment.status === 'completed' && !payment.refundRequest;
+  },
+
+  /**
+   * Check if payment can be disputed
+   */
+  canDispute(payment: Payment): boolean {
+    return payment.status === 'completed' && !payment.refundRequest;
+  },
 };
 
-export const redirectToCheckout = async (sessionUrl: string) => {
-  try {
-    window.location.href = sessionUrl;
-  } catch (error) {
-    console.error('Error redirecting to checkout:', error);
-    throw new Error('فشل في الانتقال إلى صفحة الدفع');
-  }
+// Legacy functions for backward compatibility
+export const createPayment = async (
+  data: CreatePaymentRequest
+): Promise<ApiResponse<Payment>> => {
+  return paymentService.createPayment(data);
 };
 
-// Not needed for hosted checkout
-export const getStripe = () => null;
+export const getPaymentDetails = async (
+  paymentId: string
+): Promise<ApiResponse<Payment>> => {
+  return paymentService.getPaymentById(paymentId);
+};
 
-// Test function to verify proxy is working
-export const testPaymentConnection = async (): Promise<boolean> => {
-  try {
-    console.log('Testing payment connection...');
-    const response = await fetch('/api/payment/test');
-    const result = await response.json();
-    console.log('Payment test result:', result);
-    return result.success === true;
-  } catch (error) {
-    console.error('Payment connection test failed:', error);
-    return false;
-  }
-}; 
+export const getMyTransactions = async (
+  filters?: PaymentFilters
+): Promise<ApiResponse<PaginatedResponse<Payment>>> => {
+  return paymentService.getMyTransactions(filters);
+};
+
+export default paymentService; 
