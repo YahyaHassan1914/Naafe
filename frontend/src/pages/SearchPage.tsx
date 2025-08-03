@@ -27,7 +27,7 @@ const fetchListings = async (searchQuery: string, category?: string) => {
   return json.data.listings || json.data.items || [];
 };
 
-const fetchRequests = async (searchQuery: string, category?: string) => {
+const fetchRequests = async (searchQuery: string, category?: string, userSkills?: string[]) => {
   const params = new URLSearchParams();
   if (searchQuery) params.set('search', searchQuery);
   if (category) params.set('category', category);
@@ -36,6 +36,11 @@ const fetchRequests = async (searchQuery: string, category?: string) => {
   params.set('limit', '20'); // Limit results to avoid overwhelming
   params.set('sort', 'recent'); // Show recent requests first
   params.set('status', 'open'); // Only show open requests
+  
+  // For providers, filter by their skills if no specific category selected
+  if (!category && userSkills && userSkills.length > 0) {
+    userSkills.forEach(skill => params.append('skills', skill));
+  }
   
   const res = await fetch(`/api/requests?${params.toString()}`);
   const json = await res.json();
@@ -51,22 +56,34 @@ const SearchPage = () => {
   const { user } = useAuth();
   const { getFiltersFromUrl } = useUrlParams();
   
-  // Simple state management
+  // Smart state management with role-based defaults
   const [searchQuery, setSearchQuery] = useState('');
-  const [userIntent, setUserIntent] = useState<UserIntent>('need-service');
+  const [userIntent, setUserIntent] = useState<UserIntent>(() => {
+    // Set default based on user role
+    if (user?.roles?.includes('provider')) return 'want-work';
+    return 'need-service';
+  });
   const [selectedCategory, setSelectedCategory] = useState('');
   
-  // Get initial search query from URL
+  // Get initial search query from URL with smart defaults
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const query = urlParams.get('query') || '';
     const category = urlParams.get('category') || '';
-    const intent = urlParams.get('intent') as UserIntent || 'need-service';
+    const intent = urlParams.get('intent') as UserIntent;
     
     setSearchQuery(query);
     setSelectedCategory(category);
-    setUserIntent(intent);
-  }, [location.search]);
+    
+    // Only override intent if explicitly provided in URL
+    if (intent) {
+      setUserIntent(intent);
+    } else {
+      // Use role-based default
+      const defaultIntent = user?.roles?.includes('provider') ? 'want-work' : 'need-service';
+      setUserIntent(defaultIntent);
+    }
+  }, [location.search, user?.roles]);
 
   // Fetch data based on search with smart defaults
   const { data: providers = [], isLoading: providersLoading } = useQuery({
@@ -78,8 +95,8 @@ const SearchPage = () => {
   });
 
   const { data: requests = [], isLoading: requestsLoading } = useQuery({
-    queryKey: ['requests', searchQuery, selectedCategory, userIntent],
-    queryFn: () => fetchRequests(searchQuery, selectedCategory),
+    queryKey: ['requests', searchQuery, selectedCategory, userIntent, user?.providerProfile?.skills],
+    queryFn: () => fetchRequests(searchQuery, selectedCategory, user?.providerProfile?.skills),
     enabled: userIntent === 'want-work',
     // Always fetch for providers - show relevant requests even without search
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -230,25 +247,29 @@ const SearchPage = () => {
         </div>
       </div>
 
-      {/* Popular Categories */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold text-gray-700 mb-4">خدمات شائعة</h3>
-        <div className="flex flex-wrap gap-3">
-          {popularCategories.map((category) => (
-            <button
-              key={category}
-              onClick={() => handleCategorySelect(category)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                selectedCategory === category
-                  ? 'bg-deep-teal text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-      </div>
+             {/* Popular Categories - Only show for seekers or when provider wants to browse */}
+       {(userIntent === 'need-service' || (userIntent === 'want-work' && !user?.providerProfile?.skills)) && (
+         <div className="mb-8">
+           <h3 className="text-lg font-semibold text-gray-700 mb-4">
+             {userIntent === 'need-service' ? 'خدمات شائعة' : 'فئات الخدمات'}
+           </h3>
+           <div className="flex flex-wrap gap-3">
+             {popularCategories.map((category) => (
+               <button
+                 key={category}
+                 onClick={() => handleCategorySelect(category)}
+                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                   selectedCategory === category
+                     ? 'bg-deep-teal text-white'
+                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                 }`}
+               >
+                 {category}
+               </button>
+             ))}
+           </div>
+         </div>
+       )}
     </div>
   );
 
@@ -369,19 +390,22 @@ const SearchPage = () => {
           </div>
         </div>
       );
-    } else {
-      return (
-        <div className="text-center py-16">
-          <FileText className="w-20 h-20 text-gray-300 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-gray-700 mb-4">
-            ابحث عن فرص العمل
-          </h2>
-          <p className="text-gray-600 mb-8 max-w-md mx-auto">
-            اختر فئة أو اكتب ما تبحث عنه لرؤية طلبات الخدمات المتاحة
-          </p>
-        </div>
-      );
-    }
+         } else {
+       return (
+         <div className="text-center py-16">
+           <FileText className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+           <h2 className="text-2xl font-bold text-gray-700 mb-4">
+             {user?.providerProfile?.skills ? 'طلبات العمل المتاحة لك' : 'ابحث عن فرص العمل'}
+           </h2>
+           <p className="text-gray-600 mb-8 max-w-md mx-auto">
+             {user?.providerProfile?.skills 
+               ? 'هنا الطلبات المتاحة في مجالك. يمكنك البحث عن طلبات محددة أو تصفح الفئات الأخرى.'
+               : 'اختر فئة أو اكتب ما تبحث عنه لرؤية طلبات الخدمات المتاحة'
+             }
+           </p>
+         </div>
+       );
+     }
   };
 
   return (
