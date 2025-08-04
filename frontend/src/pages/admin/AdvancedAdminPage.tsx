@@ -32,6 +32,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useApi } from '../../hooks/useApi';
 import AdminRoleManager from '../../components/admin/roles/AdminRoleManager';
 import EvidenceReviewSystem from '../../components/admin/evidence/EvidenceReviewSystem';
+import PaymentVerificationSystem from '../../components/payments/PaymentVerificationSystem';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 
@@ -65,7 +66,7 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
   const { user } = useAuth();
   const { showToast } = useToast();
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'evidence' | 'disputes' | 'notifications' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'evidence' | 'payments' | 'disputes' | 'notifications' | 'analytics'>('overview');
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [userPermissions, setUserPermissions] = useState<AdminPermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +96,7 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
     const requiredPermissions: { [key: string]: string[] } = {
       roles: ['admin.roles.manage'],
       evidence: ['admin.evidence.review'],
+      payments: ['admin.payments.verify'],
       disputes: ['admin.disputes.manage'],
       notifications: ['admin.notifications.send'],
       analytics: ['admin.analytics.view']
@@ -201,28 +203,39 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
               <Lock className="w-4 h-4 inline mr-2" />
               الأدوار والصلاحيات
             </button>
-            <button
-              onClick={() => handleTabChange('evidence')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === 'evidence'
-                  ? 'border-deep-teal text-deep-teal'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <FileImage className="w-4 h-4 inline mr-2" />
-              مراجعة الأدلة
-            </button>
-            <button
-              onClick={() => handleTabChange('disputes')}
-              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === 'disputes'
-                  ? 'border-deep-teal text-deep-teal'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <MessageCircle className="w-4 h-4 inline mr-2" />
-              النزاعات
-            </button>
+                         <button
+               onClick={() => handleTabChange('evidence')}
+               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                 activeTab === 'evidence'
+                   ? 'border-deep-teal text-deep-teal'
+                   : 'border-transparent text-gray-500 hover:text-gray-700'
+               }`}
+             >
+               <FileImage className="w-4 h-4 inline mr-2" />
+               مراجعة الأدلة
+             </button>
+             <button
+               onClick={() => handleTabChange('payments')}
+               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                 activeTab === 'payments'
+                   ? 'border-deep-teal text-deep-teal'
+                   : 'border-transparent text-gray-500 hover:text-gray-700'
+               }`}
+             >
+               <DollarSign className="w-4 h-4 inline mr-2" />
+               المدفوعات
+             </button>
+             <button
+               onClick={() => handleTabChange('disputes')}
+               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                 activeTab === 'disputes'
+                   ? 'border-deep-teal text-deep-teal'
+                   : 'border-transparent text-gray-500 hover:text-gray-700'
+               }`}
+             >
+               <MessageCircle className="w-4 h-4 inline mr-2" />
+               النزاعات
+             </button>
             <button
               onClick={() => handleTabChange('notifications')}
               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
@@ -388,22 +401,30 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
                   <Lock className="w-4 h-4" />
                   إدارة الأدوار
                 </Button>
-                <Button
-                  onClick={() => handleTabChange('evidence')}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <FileImage className="w-4 h-4" />
-                  مراجعة الأدلة
-                </Button>
-                <Button
-                  onClick={() => handleTabChange('disputes')}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  النزاعات
-                </Button>
+                                 <Button
+                   onClick={() => handleTabChange('evidence')}
+                   variant="outline"
+                   className="flex items-center gap-2"
+                 >
+                   <FileImage className="w-4 h-4" />
+                   مراجعة الأدلة
+                 </Button>
+                 <Button
+                   onClick={() => handleTabChange('payments')}
+                   variant="outline"
+                   className="flex items-center gap-2"
+                 >
+                   <DollarSign className="w-4 h-4" />
+                   المدفوعات
+                 </Button>
+                 <Button
+                   onClick={() => handleTabChange('disputes')}
+                   variant="outline"
+                   className="flex items-center gap-2"
+                 >
+                   <MessageCircle className="w-4 h-4" />
+                   النزاعات
+                 </Button>
                 <Button
                   onClick={() => handleTabChange('notifications')}
                   variant="outline"
@@ -421,9 +442,13 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
           <AdminRoleManager />
         )}
 
-        {activeTab === 'evidence' && (
-          <EvidenceReviewSystem />
-        )}
+                 {activeTab === 'evidence' && (
+           <EvidenceReviewSystem />
+         )}
+
+         {activeTab === 'payments' && (
+           <PaymentVerificationSystem />
+         )}
 
         {activeTab === 'disputes' && (
           <div className="text-center py-12">
