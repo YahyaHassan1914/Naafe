@@ -57,6 +57,7 @@ import EgyptianPaymentPage from './pages/payments/EgyptianPaymentPage';
 import ActivityMonitoringPage from './pages/monitoring/ActivityMonitoringPage';
 import EnhancedProviderDashboardPage from './pages/provider/EnhancedProviderDashboardPage';
 import AdvancedAnalyticsPage from './pages/analytics/AdvancedAnalyticsPage';
+import DisputeResolutionPage from './pages/admin/DisputeResolutionPage';
 import BookingSystem from './components/ui/BookingSystem';
 import { ResetPasswordHandler } from './components/ui/ResetPasswordHandler';
 
@@ -146,6 +147,11 @@ const App = () => {
         <Route path="/advanced-analytics" element={
           <ProtectedRoute requiredRoles={['admin']}>
             <AdvancedAnalyticsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/dispute-resolution" element={
+          <ProtectedRoute requiredRoles={['admin']}>
+            <DisputeResolutionPage />
           </ProtectedRoute>
         } />
          <Route path="/booking/:providerId" element={
