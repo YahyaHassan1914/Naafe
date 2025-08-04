@@ -1,1 +1,1 @@
-export { default as OfferAnalyticsPage } from './OfferAnalyticsPage'; 
+export { default as AdvancedAnalyticsPage } from './AdvancedAnalyticsPage'; 
