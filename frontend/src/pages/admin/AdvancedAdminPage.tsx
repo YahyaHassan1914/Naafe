@@ -33,6 +33,7 @@ import { useApi } from '../../hooks/useApi';
 import AdminRoleManager from '../../components/admin/roles/AdminRoleManager';
 import EvidenceReviewSystem from '../../components/admin/evidence/EvidenceReviewSystem';
 import PaymentVerificationSystem from '../../components/payments/PaymentVerificationSystem';
+import RealTimeActivityMonitor from '../../components/monitoring/RealTimeActivityMonitor';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 
@@ -66,7 +67,7 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
   const { user } = useAuth();
   const { showToast } = useToast();
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'evidence' | 'payments' | 'disputes' | 'notifications' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'evidence' | 'payments' | 'monitoring' | 'disputes' | 'notifications' | 'analytics'>('overview');
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [userPermissions, setUserPermissions] = useState<AdminPermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,6 +98,7 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
       roles: ['admin.roles.manage'],
       evidence: ['admin.evidence.review'],
       payments: ['admin.payments.verify'],
+      monitoring: ['admin.monitoring.view'],
       disputes: ['admin.disputes.manage'],
       notifications: ['admin.notifications.send'],
       analytics: ['admin.analytics.view']
@@ -224,6 +226,17 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
              >
                <DollarSign className="w-4 h-4 inline mr-2" />
                المدفوعات
+             </button>
+             <button
+               onClick={() => handleTabChange('monitoring')}
+               className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
+                 activeTab === 'monitoring'
+                   ? 'border-deep-teal text-deep-teal'
+                   : 'border-transparent text-gray-500 hover:text-gray-700'
+               }`}
+             >
+               <Activity className="w-4 h-4 inline mr-2" />
+               المراقبة
              </button>
              <button
                onClick={() => handleTabChange('disputes')}
@@ -418,6 +431,14 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
                    المدفوعات
                  </Button>
                  <Button
+                   onClick={() => handleTabChange('monitoring')}
+                   variant="outline"
+                   className="flex items-center gap-2"
+                 >
+                   <Activity className="w-4 h-4" />
+                   المراقبة
+                 </Button>
+                 <Button
                    onClick={() => handleTabChange('disputes')}
                    variant="outline"
                    className="flex items-center gap-2"
@@ -446,11 +467,15 @@ const AdvancedAdminPage: React.FC<AdvancedAdminPageProps> = ({ className = '' })
            <EvidenceReviewSystem />
          )}
 
-         {activeTab === 'payments' && (
+                  {activeTab === 'payments' && (
            <PaymentVerificationSystem />
          )}
 
-        {activeTab === 'disputes' && (
+         {activeTab === 'monitoring' && (
+           <RealTimeActivityMonitor />
+         )}
+
+         {activeTab === 'disputes' && (
           <div className="text-center py-12">
             <MessageCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">مركز حل النزاعات</h3>

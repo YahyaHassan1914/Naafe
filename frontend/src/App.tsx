@@ -54,6 +54,7 @@ import RequestSuccessPage from './pages/requests/RequestSuccessPage';
 import SmartMatchingPage from './pages/matching/SmartMatchingPage';
 import AdvancedAdminPage from './pages/admin/AdvancedAdminPage';
 import EgyptianPaymentPage from './pages/payments/EgyptianPaymentPage';
+import ActivityMonitoringPage from './pages/monitoring/ActivityMonitoringPage';
 import BookingSystem from './components/ui/BookingSystem';
 import { ResetPasswordHandler } from './components/ui/ResetPasswordHandler';
 
@@ -125,11 +126,16 @@ const App = () => {
              <AdvancedAdminPage />
            </ProtectedRoute>
          } />
-         <Route path="/payment/:paymentId" element={
-           <ProtectedRoute requiredRoles={['seeker', 'provider']}>
-             <EgyptianPaymentPage />
-           </ProtectedRoute>
-         } />
+                 <Route path="/payment/:paymentId" element={
+          <ProtectedRoute requiredRoles={['seeker', 'provider']}>
+            <EgyptianPaymentPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/monitoring" element={
+          <ProtectedRoute requiredRoles={['admin']}>
+            <ActivityMonitoringPage />
+          </ProtectedRoute>
+        } />
          <Route path="/booking/:providerId" element={
            <ProtectedRoute requiredRoles={['seeker']}>
              <BookingSystem />
