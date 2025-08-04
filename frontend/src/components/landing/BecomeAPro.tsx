@@ -10,9 +10,12 @@ const BecomeAPro: React.FC = () => {
   const handleProviderAction = () => {
     if (!user) {
       navigate('/register');
-    } else {
-      // Navigate to provider dashboard or profile
+    } else if (user.roles?.includes('provider')) {
+      // User is already a provider, navigate to dashboard
       navigate('/provider-dashboard');
+    } else {
+      // User is a seeker, navigate to application form
+      navigate('/provider-application');
     }
   };
 

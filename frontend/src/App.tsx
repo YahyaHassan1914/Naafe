@@ -48,6 +48,7 @@ import SchedulePage from './pages/SchedulePage';
 import RequestSuccessPage from './pages/RequestSuccessPage';
 import ProviderDashboardPage from './pages/ProviderDashboardPage';
 import ProviderProfilePage from './pages/ProviderProfilePage';
+import ProviderApplicationPage from './pages/provider/ProviderApplicationPage';
 import BookingSystem from './components/ui/BookingSystem';
 import { ResetPasswordHandler } from './components/ui/ResetPasswordHandler';
 
@@ -92,6 +93,11 @@ const App = () => {
                  <Route path="/provider-profile" element={
            <ProtectedRoute requiredRoles={['provider']}>
              <ProviderProfilePage />
+           </ProtectedRoute>
+         } />
+         <Route path="/provider-application" element={
+           <ProtectedRoute>
+             <ProviderApplicationPage />
            </ProtectedRoute>
          } />
          <Route path="/booking/:providerId" element={
