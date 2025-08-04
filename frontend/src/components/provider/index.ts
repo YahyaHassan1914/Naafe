@@ -1,2 +1,1 @@
-export { default as ProviderApplicationForm } from './ProviderApplicationForm';
-export { default as ApplicationStatusTracker } from './ApplicationStatusTracker'; 
+export { default as EnhancedProviderDashboard } from './EnhancedProviderDashboard'; 

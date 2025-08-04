@@ -1,1 +1,1 @@
-export { default as ProviderApplicationPage } from './ProviderApplicationPage'; 
+export { default as EnhancedProviderDashboardPage } from './EnhancedProviderDashboardPage'; 
