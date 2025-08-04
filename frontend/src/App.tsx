@@ -24,6 +24,10 @@ import RequestServiceDetailsPage from './pages/RequestServiceDetailsPage';
 import ServiceResponseForm from './components/ServiceResponseForm';
 
 import AdminManageComplaints from './admin/pages/AdminManageComplaints';
+import AdminManagePayments from './admin/pages/AdminManagePayments';
+import AdminManageOffers from './admin/pages/AdminManageOffers';
+import AdminManageReviews from './admin/pages/AdminManageReviews';
+import AdminReports from './admin/pages/AdminReports';
 import HelpCenterPage from './pages/HelpCenterPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -180,6 +184,10 @@ const App = () => {
                 <Route path="categories" element={<AdminManageCategories />} />
 
                 <Route path="complaints" element={<AdminManageComplaints />} />
+                <Route path="payments" element={<AdminManagePayments />} />
+                <Route path="offers" element={<AdminManageOffers />} />
+                <Route path="reviews" element={<AdminManageReviews />} />
+                <Route path="reports" element={<AdminReports />} />
               </Route>
               {/* Fallback routes for footer links */}
               <Route path="/services" element={<Navigate to="/categories" replace />} />
