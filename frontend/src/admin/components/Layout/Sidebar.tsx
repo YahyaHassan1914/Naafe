@@ -11,7 +11,8 @@ import {
   DollarSign,
   Briefcase,
   MessageSquare,
-  BarChart3
+  BarChart3,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -28,6 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, className }) => {
     { path: '/admin/users', icon: Users, label: 'المستخدمين' },
     { path: '/admin/identity-verifications', icon: Shield, label: 'التحقق من الهوية' },
     { path: '/admin/categories', icon: List, label: 'الفئات' },
+    { path: '/admin/service-requests', icon: FileText, label: 'طلبات الخدمات' },
     { path: '/admin/complaints', icon: AlertTriangle, label: 'البلاغات' },
     { path: '/admin/payments', icon: DollarSign, label: 'المدفوعات' },
     { path: '/admin/offers', icon: Briefcase, label: 'العروض' },

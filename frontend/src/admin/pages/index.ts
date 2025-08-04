@@ -6,4 +6,5 @@ export { default as AdminManageComplaints } from './AdminManageComplaints';
 export { default as AdminManagePayments } from './AdminManagePayments';
 export { default as AdminManageOffers } from './AdminManageOffers';
 export { default as AdminManageReviews } from './AdminManageReviews';
-export { default as AdminReports } from './AdminReports'; 
+export { default as AdminReports } from './AdminReports';
+export { default as AdminServiceRequests } from './AdminServiceRequests'; 

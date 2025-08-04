@@ -28,6 +28,7 @@ import AdminManagePayments from './admin/pages/AdminManagePayments';
 import AdminManageOffers from './admin/pages/AdminManageOffers';
 import AdminManageReviews from './admin/pages/AdminManageReviews';
 import AdminReports from './admin/pages/AdminReports';
+import AdminServiceRequests from './admin/pages/AdminServiceRequests';
 import HelpCenterPage from './pages/HelpCenterPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -188,6 +189,7 @@ const App = () => {
                 <Route path="offers" element={<AdminManageOffers />} />
                 <Route path="reviews" element={<AdminManageReviews />} />
                 <Route path="reports" element={<AdminReports />} />
+                <Route path="service-requests" element={<AdminServiceRequests />} />
               </Route>
               {/* Fallback routes for footer links */}
               <Route path="/services" element={<Navigate to="/categories" replace />} />
