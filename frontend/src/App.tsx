@@ -49,6 +49,8 @@ import RequestSuccessPage from './pages/RequestSuccessPage';
 import ProviderDashboardPage from './pages/ProviderDashboardPage';
 import ProviderProfilePage from './pages/ProviderProfilePage';
 import ProviderApplicationPage from './pages/provider/ProviderApplicationPage';
+import EnhancedRequestForm from './components/requests/EnhancedRequestForm';
+import RequestSuccessPage from './pages/requests/RequestSuccessPage';
 import BookingSystem from './components/ui/BookingSystem';
 import { ResetPasswordHandler } from './components/ui/ResetPasswordHandler';
 
@@ -98,6 +100,16 @@ const App = () => {
          <Route path="/provider-application" element={
            <ProtectedRoute>
              <ProviderApplicationPage />
+           </ProtectedRoute>
+         } />
+         <Route path="/enhanced-request" element={
+           <ProtectedRoute requiredRoles={['seeker']}>
+             <EnhancedRequestForm />
+           </ProtectedRoute>
+         } />
+         <Route path="/request-success" element={
+           <ProtectedRoute requiredRoles={['seeker']}>
+             <RequestSuccessPage />
            </ProtectedRoute>
          } />
          <Route path="/booking/:providerId" element={
